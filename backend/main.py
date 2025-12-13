@@ -26,6 +26,11 @@ async def root():
     """Serve the console"""
     return FileResponse("frontend/index.html")
 
+@app.get("/framework")
+async def framework():
+    """Serve the decision framework documentation"""
+    return FileResponse("frontend/framework.html")
+
 @app.post("/api/debate")
 async def start_debate(payload: dict):
     """Start a new debate session"""

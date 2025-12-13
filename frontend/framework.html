@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Decision Framework - Executive Board Debate</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%);
+            color: #e2e8f0;
+            min-height: 100vh;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 50px;
+            padding: 40px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 15px;
+            background: linear-gradient(135deg, #60a5fa, #34d399);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header .subtitle {
+            font-size: 1.2em;
+            color: #94a3b8;
+            margin-bottom: 20px;
+        }
+
+        .back-link {
+            display: inline-block;
+            color: #60a5fa;
+            text-decoration: none;
+            font-size: 0.95em;
+            transition: color 0.2s;
+        }
+
+        .back-link:hover {
+            color: #93c5fd;
+        }
+
+        /* Sections */
+        section {
+            margin-bottom: 50px;
+        }
+
+        section h2 {
+            font-size: 1.8em;
+            margin-bottom: 25px;
+            color: #f1f5f9;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        /* Flow Diagram */
+        .flow-container {
+            background: rgba(30, 58, 138, 0.2);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 12px;
+            padding: 40px;
+        }
+
+        .flow-steps {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .flow-step {
+            flex: 1;
+            min-width: 180px;
+            text-align: center;
+            padding: 25px 15px;
+            background: rgba(15, 23, 42, 0.6);
+            border-radius: 12px;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            position: relative;
+        }
+
+        .flow-step .step-number {
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #3b82f6;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            font-size: 0.8em;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .flow-step .step-icon {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        .flow-step .step-title {
+            font-weight: 600;
+            color: #f1f5f9;
+            margin-bottom: 5px;
+        }
+
+        .flow-step .step-desc {
+            font-size: 0.85em;
+            color: #94a3b8;
+        }
+
+        .flow-arrow {
+            font-size: 1.5em;
+            color: #3b82f6;
+        }
+
+        /* Executive Cards */
+        .exec-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .exec-card {
+            background: rgba(15, 23, 42, 0.6);
+            border-radius: 12px;
+            padding: 25px;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .exec-card:hover {
+            transform: translateY(-3px);
+            border-color: rgba(96, 165, 250, 0.4);
+        }
+
+        .exec-card .exec-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .exec-card .exec-emoji {
+            font-size: 2.5em;
+        }
+
+        .exec-card .exec-info h3 {
+            color: #f1f5f9;
+            font-size: 1.1em;
+        }
+
+        .exec-card .exec-info .exec-name {
+            color: #94a3b8;
+            font-size: 0.9em;
+        }
+
+        .exec-card .exec-focus {
+            margin-bottom: 15px;
+        }
+
+        .exec-card .exec-focus-title {
+            font-size: 0.8em;
+            text-transform: uppercase;
+            color: #64748b;
+            margin-bottom: 5px;
+        }
+
+        .exec-card .exec-focus-content {
+            color: #cbd5e1;
+            font-size: 0.95em;
+        }
+
+        .exec-card .exec-analyzes {
+            font-size: 0.85em;
+            color: #94a3b8;
+        }
+
+        .exec-card .exec-analyzes ul {
+            margin-top: 8px;
+            margin-left: 18px;
+        }
+
+        .exec-card .exec-analyzes li {
+            margin-bottom: 4px;
+        }
+
+        /* Role colors */
+        .exec-card.cfo { border-left: 3px solid #22c55e; }
+        .exec-card.cpo { border-left: 3px solid #a855f7; }
+        .exec-card.cto { border-left: 3px solid #3b82f6; }
+        .exec-card.cro { border-left: 3px solid #f59e0b; }
+
+        /* Consensus Section */
+        .consensus-box {
+            background: rgba(30, 58, 138, 0.2);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 12px;
+            padding: 30px;
+        }
+
+        .consensus-visual {
+            display: flex;
+            align-items: center;
+            gap: 30px;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+        }
+
+        .consensus-bar-example {
+            flex: 1;
+            min-width: 250px;
+        }
+
+        .bar-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85em;
+            color: #94a3b8;
+            margin-bottom: 8px;
+        }
+
+        .bar-track {
+            height: 12px;
+            background: rgba(15, 23, 42, 0.6);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .bar-fill {
+            height: 100%;
+            border-radius: 6px;
+            transition: width 0.5s;
+        }
+
+        .bar-fill.high { background: linear-gradient(90deg, #22c55e, #4ade80); width: 85%; }
+        .bar-fill.medium { background: linear-gradient(90deg, #f59e0b, #fbbf24); width: 60%; }
+        .bar-fill.low { background: linear-gradient(90deg, #ef4444, #f87171); width: 35%; }
+
+        .consensus-meaning {
+            flex: 1;
+            min-width: 250px;
+        }
+
+        .meaning-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            font-size: 0.9em;
+        }
+
+        .meaning-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .meaning-dot.high { background: #22c55e; }
+        .meaning-dot.medium { background: #f59e0b; }
+        .meaning-dot.low { background: #ef4444; }
+
+        /* Output Section */
+        .output-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+
+        .output-card {
+            background: rgba(15, 23, 42, 0.6);
+            border-radius: 12px;
+            padding: 25px;
+            text-align: center;
+            border: 2px solid transparent;
+        }
+
+        .output-card.go { border-color: #22c55e; }
+        .output-card.pivot { border-color: #f59e0b; }
+        .output-card.hold { border-color: #ef4444; }
+
+        .output-card .output-badge {
+            font-size: 1.5em;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .output-card.go .output-badge { color: #22c55e; }
+        .output-card.pivot .output-badge { color: #f59e0b; }
+        .output-card.hold .output-badge { color: #ef4444; }
+
+        .output-card .output-desc {
+            font-size: 0.9em;
+            color: #94a3b8;
+        }
+
+        /* Key Benefits */
+        .benefits-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .benefit-card {
+            background: rgba(15, 23, 42, 0.4);
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .benefit-card .benefit-icon {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        .benefit-card .benefit-title {
+            font-weight: 600;
+            color: #f1f5f9;
+            margin-bottom: 5px;
+        }
+
+        .benefit-card .benefit-desc {
+            font-size: 0.85em;
+            color: #94a3b8;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 30px;
+            color: #64748b;
+            font-size: 0.9em;
+        }
+
+        .footer a {
+            color: #60a5fa;
+            text-decoration: none;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .flow-steps {
+                flex-direction: column;
+            }
+            .flow-arrow {
+                transform: rotate(90deg);
+            }
+            .output-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1>Executive Board Debate</h1>
+            <p class="subtitle">AI-powered multi-perspective decision framework</p>
+            <a href="/" class="back-link">← Back to Console</a>
+        </header>
+
+        <!-- How It Works -->
+        <section>
+            <h2>📊 How It Works</h2>
+            <div class="flow-container">
+                <div class="flow-steps">
+                    <div class="flow-step">
+                        <span class="step-number">1</span>
+                        <div class="step-icon">❓</div>
+                        <div class="step-title">Submit Question</div>
+                        <div class="step-desc">You ask a product decision question with company context</div>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step">
+                        <span class="step-number">2</span>
+                        <div class="step-icon">👥</div>
+                        <div class="step-title">Parallel Analysis</div>
+                        <div class="step-desc">4 AI executives analyze simultaneously from their perspectives</div>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step">
+                        <span class="step-number">3</span>
+                        <div class="step-icon">📈</div>
+                        <div class="step-title">Consensus Check</div>
+                        <div class="step-desc">System measures alignment across all perspectives</div>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step">
+                        <span class="step-number">4</span>
+                        <div class="step-icon">✅</div>
+                        <div class="step-title">Final Decision</div>
+                        <div class="step-desc">Synthesized recommendation with next steps</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- The Executive Team -->
+        <section>
+            <h2>👔 The Executive Team</h2>
+            <div class="exec-grid">
+                <div class="exec-card cfo">
+                    <div class="exec-header">
+                        <div class="exec-emoji">💰</div>
+                        <div class="exec-info">
+                            <h3>CFO</h3>
+                            <div class="exec-name">Alex Chen</div>
+                        </div>
+                    </div>
+                    <div class="exec-focus">
+                        <div class="exec-focus-title">Primary Focus</div>
+                        <div class="exec-focus-content">ROI, profitability, capital efficiency</div>
+                    </div>
+                    <div class="exec-analyzes">
+                        Analyzes:
+                        <ul>
+                            <li>Unit economics (CAC, LTV, payback)</li>
+                            <li>3-year P&L projections</li>
+                            <li>Budget requirements</li>
+                            <li>Opportunity cost</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="exec-card cpo">
+                    <div class="exec-header">
+                        <div class="exec-emoji">🎯</div>
+                        <div class="exec-info">
+                            <h3>CPO</h3>
+                            <div class="exec-name">Jamie Rodriguez</div>
+                        </div>
+                    </div>
+                    <div class="exec-focus">
+                        <div class="exec-focus-title">Primary Focus</div>
+                        <div class="exec-focus-content">Product-market fit, customer needs</div>
+                    </div>
+                    <div class="exec-analyzes">
+                        Analyzes:
+                        <ul>
+                            <li>Market demand signals</li>
+                            <li>Competitive positioning</li>
+                            <li>Roadmap alignment</li>
+                            <li>User experience impact</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="exec-card cto">
+                    <div class="exec-header">
+                        <div class="exec-emoji">⚙️</div>
+                        <div class="exec-info">
+                            <h3>CTO</h3>
+                            <div class="exec-name">Sam Park</div>
+                        </div>
+                    </div>
+                    <div class="exec-focus">
+                        <div class="exec-focus-title">Primary Focus</div>
+                        <div class="exec-focus-content">Technical feasibility, engineering effort</div>
+                    </div>
+                    <div class="exec-analyzes">
+                        Analyzes:
+                        <ul>
+                            <li>Implementation complexity</li>
+                            <li>Timeline to MVP & production</li>
+                            <li>Scalability to 10x</li>
+                            <li>Technical debt impact</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="exec-card cro">
+                    <div class="exec-header">
+                        <div class="exec-emoji">📊</div>
+                        <div class="exec-info">
+                            <h3>CRO</h3>
+                            <div class="exec-name">Taylor Morgan</div>
+                        </div>
+                    </div>
+                    <div class="exec-focus">
+                        <div class="exec-focus-title">Primary Focus</div>
+                        <div class="exec-focus-content">Revenue impact, competitive positioning</div>
+                    </div>
+                    <div class="exec-analyzes">
+                        Analyzes:
+                        <ul>
+                            <li>Sales cycle impact</li>
+                            <li>Win rate improvements</li>
+                            <li>Pricing opportunities</li>
+                            <li>Market timing</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Consensus Mechanism -->
+        <section>
+            <h2>📏 Consensus Measurement</h2>
+            <div class="consensus-box">
+                <p style="margin-bottom: 20px; color: #cbd5e1;">
+                    Each executive provides a recommendation. The system calculates how closely they agree:
+                </p>
+                <div class="consensus-visual">
+                    <div class="consensus-bar-example">
+                        <div class="bar-label">
+                            <span>High Alignment (85%)</span>
+                            <span>Team agrees</span>
+                        </div>
+                        <div class="bar-track">
+                            <div class="bar-fill high"></div>
+                        </div>
+                        <br>
+                        <div class="bar-label">
+                            <span>Moderate (60%)</span>
+                            <span>Some debate</span>
+                        </div>
+                        <div class="bar-track">
+                            <div class="bar-fill medium"></div>
+                        </div>
+                        <br>
+                        <div class="bar-label">
+                            <span>Low (35%)</span>
+                            <span>Team divided</span>
+                        </div>
+                        <div class="bar-track">
+                            <div class="bar-fill low"></div>
+                        </div>
+                    </div>
+                    <div class="consensus-meaning">
+                        <div class="meaning-item">
+                            <div class="meaning-dot high"></div>
+                            <span><strong>&gt;75%</strong> — Strong consensus, confident decision</span>
+                        </div>
+                        <div class="meaning-item">
+                            <div class="meaning-dot medium"></div>
+                            <span><strong>50-75%</strong> — Moderate agreement, review tradeoffs</span>
+                        </div>
+                        <div class="meaning-item">
+                            <div class="meaning-dot low"></div>
+                            <span><strong>&lt;50%</strong> — Team divided, needs discussion</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Final Output -->
+        <section>
+            <h2>🎯 Decision Output</h2>
+            <div class="output-grid">
+                <div class="output-card go">
+                    <div class="output-badge">GO</div>
+                    <div class="output-desc">Execute the decision with confidence. Team aligned, benefits clear.</div>
+                </div>
+                <div class="output-card pivot">
+                    <div class="output-badge">PIVOT</div>
+                    <div class="output-desc">Proceed with modifications based on executive feedback.</div>
+                </div>
+                <div class="output-card hold">
+                    <div class="output-badge">HOLD</div>
+                    <div class="output-desc">Defer decision. More analysis or alignment needed.</div>
+                </div>
+            </div>
+            <p style="margin-top: 20px; color: #94a3b8; text-align: center;">
+                Each decision includes: confidence level, executive summary, consensus points, disagreements, and next steps.
+            </p>
+        </section>
+
+        <!-- Key Benefits -->
+        <section>
+            <h2>✨ Key Benefits</h2>
+            <div class="benefits-grid">
+                <div class="benefit-card">
+                    <div class="benefit-icon">⚡</div>
+                    <div class="benefit-title">Speed</div>
+                    <div class="benefit-desc">4 perspectives in 30-60 seconds, not days of meetings</div>
+                </div>
+                <div class="benefit-card">
+                    <div class="benefit-icon">👁️</div>
+                    <div class="benefit-title">Transparency</div>
+                    <div class="benefit-desc">See each executive's reasoning in real-time</div>
+                </div>
+                <div class="benefit-card">
+                    <div class="benefit-icon">⚖️</div>
+                    <div class="benefit-title">Objectivity</div>
+                    <div class="benefit-desc">Structured analysis removes bias and politics</div>
+                </div>
+                <div class="benefit-card">
+                    <div class="benefit-icon">🎯</div>
+                    <div class="benefit-title">Actionability</div>
+                    <div class="benefit-desc">Clear recommendation with prioritized next steps</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>Executive Board Debate Framework v1.0</p>
+            <p><a href="/">← Return to Console</a></p>
+        </footer>
+    </div>
+</body>
+</html>
