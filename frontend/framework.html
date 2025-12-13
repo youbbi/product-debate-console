@@ -453,33 +453,77 @@
             font-size: 1.2em;
         }
 
-        .ai-features {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 15px;
-        }
-
-        .ai-feature {
+        .llm-examples {
             display: flex;
-            align-items: flex-start;
-            gap: 12px;
-            padding: 15px;
-            background: rgba(15, 23, 42, 0.4);
-            border-radius: 8px;
+            flex-direction: column;
+            gap: 20px;
         }
 
-        .ai-feature .feature-icon {
-            font-size: 1.3em;
-            flex-shrink: 0;
+        .llm-example {
+            background: rgba(15, 23, 42, 0.6);
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid rgba(148, 163, 184, 0.2);
         }
 
-        .ai-feature .feature-text {
-            font-size: 0.9em;
-            color: #cbd5e1;
-        }
-
-        .ai-feature .feature-text strong {
+        .llm-example-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 16px;
+            background: rgba(59, 130, 246, 0.2);
+            border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+            font-weight: 600;
             color: #f1f5f9;
+        }
+
+        .llm-example-header .step-badge {
+            font-size: 0.75em;
+            padding: 3px 8px;
+            background: #3b82f6;
+            border-radius: 4px;
+            color: white;
+        }
+
+        .llm-example-content {
+            padding: 16px;
+        }
+
+        .llm-block {
+            margin-bottom: 12px;
+        }
+
+        .llm-block:last-child {
+            margin-bottom: 0;
+        }
+
+        .llm-block-label {
+            font-size: 0.75em;
+            text-transform: uppercase;
+            color: #64748b;
+            margin-bottom: 6px;
+            font-weight: 600;
+        }
+
+        .llm-block-content {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+            padding: 12px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.8em;
+            color: #a5b4fc;
+            line-height: 1.5;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .llm-block-content .highlight {
+            color: #4ade80;
+        }
+
+        .llm-block-content .dim {
+            color: #64748b;
         }
 
         /* Responsive */
@@ -784,33 +828,89 @@
                     </div>
                 </div>
 
-                <div class="ai-features">
-                    <div class="ai-feature">
-                        <div class="feature-icon">🔒</div>
-                        <div class="feature-text">
-                            <strong>Enterprise Security</strong><br>
-                            Your data stays in Azure, never used for training
+                <div class="llm-examples">
+                    <!-- Example 1: Setup Lenses -->
+                    <div class="llm-example">
+                        <div class="llm-example-header">
+                            <span class="step-badge">Call 1</span>
+                            🎯 Setup Evaluation Lenses
+                        </div>
+                        <div class="llm-example-content">
+                            <div class="llm-block">
+                                <div class="llm-block-label">Prompt</div>
+                                <div class="llm-block-content">Create 4-5 key evaluation lenses for this decision:
+<span class="highlight">"Should we build AI-powered analytics in-house?"</span>
+
+1. Financial viability (CFO lens)
+2. Product-market fit (CPO lens)
+3. Technical feasibility (CTO lens)
+4. Revenue impact (CRO lens)</div>
+                            </div>
+                            <div class="llm-block">
+                                <div class="llm-block-label">Output</div>
+                                <div class="llm-block-content"><span class="dim">// Evaluation framework created</span>
+{
+  "lenses": ["ROI & Budget", "Customer Demand", "Engineering Effort", "Sales Impact"]
+}</div>
+                            </div>
                         </div>
                     </div>
-                    <div class="ai-feature">
-                        <div class="feature-icon">⚡</div>
-                        <div class="feature-text">
-                            <strong>Real-Time Streaming</strong><br>
-                            See responses as they're generated, token by token
+
+                    <!-- Example 2: Executive Call (CFO) -->
+                    <div class="llm-example">
+                        <div class="llm-example-header">
+                            <span class="step-badge">Call 2-5</span>
+                            💰 Executive Analysis (CFO Example)
+                        </div>
+                        <div class="llm-example-content">
+                            <div class="llm-block">
+                                <div class="llm-block-label">Persona Prompt</div>
+                                <div class="llm-block-content">You are <span class="highlight">Alex Chen, CFO</span> of a Series B SaaS company.
+Your perspective: ROI, unit economics, capital efficiency.
+Analyze P&L impact over 3 years. Ask tough questions about payback period, CAC, LTV.
+<span class="dim">Output JSON with: financial_model, key_metrics, roi_analysis, financial_recommendation...</span></div>
+                            </div>
+                            <div class="llm-block">
+                                <div class="llm-block-label">Output</div>
+                                <div class="llm-block-content">{
+  "<span class="highlight">financial_recommendation</span>": "proceed_with_caution",
+  "confidence_level": 72,
+  "key_metrics": { "payback_period": "18 months", "roi": "2.3x" },
+  "budget_required": "$450K over 3 years",
+  "cost_risks": ["scope creep", "hiring delays"]
+}</div>
+                            </div>
                         </div>
                     </div>
-                    <div class="ai-feature">
-                        <div class="feature-icon">🎭</div>
-                        <div class="feature-text">
-                            <strong>Persona Prompts</strong><br>
-                            Each exec has detailed instructions defining their perspective
+
+                    <!-- Example 3: Synthesis -->
+                    <div class="llm-example">
+                        <div class="llm-example-header">
+                            <span class="step-badge">Call 6</span>
+                            ✅ Synthesize Final Decision
                         </div>
-                    </div>
-                    <div class="ai-feature">
-                        <div class="feature-icon">📊</div>
-                        <div class="feature-text">
-                            <strong>Structured Output</strong><br>
-                            JSON responses ensure consistent, comparable analysis
+                        <div class="llm-example-content">
+                            <div class="llm-block">
+                                <div class="llm-block-label">Prompt</div>
+                                <div class="llm-block-content">Synthesize executive perspectives into a clear recommendation:
+- CFO: <span class="highlight">proceed_with_caution</span> (72% confidence)
+- CPO: <span class="highlight">go</span> (85% confidence)
+- CTO: <span class="highlight">build_with_constraints</span> (68% confidence)
+- CRO: <span class="highlight">accelerates</span> (79% confidence)
+
+Make a clear <span class="highlight">GO / PIVOT / HOLD</span> recommendation.</div>
+                            </div>
+                            <div class="llm-block">
+                                <div class="llm-block-label">Output</div>
+                                <div class="llm-block-content">{
+  "<span class="highlight">recommendation</span>": "PIVOT",
+  "confidence_level": 76,
+  "executive_summary": "Proceed with phased approach to manage financial risk",
+  "consensus_points": ["Strong market demand", "Revenue upside clear"],
+  "disagreement_areas": ["Budget allocation", "Timeline estimates"],
+  "next_steps": ["1. Start with MVP", "2. Validate with 3 customers", "3. Review at 90 days"]
+}</div>
+                            </div>
                         </div>
                     </div>
                 </div>
