@@ -31,13 +31,30 @@
                     ></textarea>
                 </div>
 
-                <div class="form-group">
-                    <label for="context">Company Context (JSON)</label>
-                    <textarea
-                        id="context"
-                        placeholder='{"company_size": "250 people", "current_revenue": "$50M ARR", "team_size": "30 engineers"}'
-                        rows="3"
-                    ></textarea>
+                <div class="context-fields">
+                    <label>Company Context</label>
+                    <div class="context-grid">
+                        <div class="context-field">
+                            <label for="companySize">Company Size</label>
+                            <input type="text" id="companySize" value="2 people">
+                        </div>
+                        <div class="context-field">
+                            <label for="currentRevenue">Current Revenue</label>
+                            <input type="text" id="currentRevenue" value="$0M ARR">
+                        </div>
+                        <div class="context-field">
+                            <label for="engineeringTeam">Engineering Team</label>
+                            <input type="text" id="engineeringTeam" value="0 engineers">
+                        </div>
+                        <div class="context-field">
+                            <label for="marketPosition">Market Position</label>
+                            <input type="text" id="marketPosition" value="new comer">
+                        </div>
+                        <div class="context-field full-width">
+                            <label for="timeline">Timeline</label>
+                            <input type="text" id="timeline" value="decision needed in the next 3 days">
+                        </div>
+                    </div>
                 </div>
 
                 <button id="startButton" class="btn btn-primary">

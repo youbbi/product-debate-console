@@ -5,10 +5,13 @@ let executiveData = {};  // Store parsed data for comparison view
 let executivePhases = {};  // Track phase state per exec: { cfo: { phase, timeline: [], inputSummary } }
 let isComparisonView = false;
 
+// Default question from Debate questions.txt
+const DEFAULT_QUESTION = `Should I pursue building my own application, which is a meal planning it's aimed for B2C. I think the unique advantage is how it's personalising the meal suggestions based on your preferences. It's smart, it always kind of anticipates your needs, it can parse any type of recipes and generates automatically your weekly meal plan based on all your most preferred recipes.
+So my question to this group is: We're a small start-up and it's a very crowded market, so is there any way we can make money out of this application?`;
+
 // DOM Elements
 const startButton = document.getElementById('startButton');
 const questionInput = document.getElementById('question');
-const contextInput = document.getElementById('context');
 const statusMessage = document.getElementById('status');
 const executivesGrid = document.getElementById('executivesGrid');
 const decisionPanel = document.getElementById('decisionPanel');
@@ -756,13 +759,14 @@ startButton.addEventListener('click', () => {
         return;
     }
 
-    let context = {};
-    try {
-        context = JSON.parse(contextInput.value || '{}');
-    } catch {
-        showStatus('Invalid context JSON', 'error');
-        return;
-    }
+    // Collect context from individual form fields
+    const context = {
+        company_size: document.getElementById('companySize').value.trim(),
+        current_revenue: document.getElementById('currentRevenue').value.trim(),
+        engineering_team: document.getElementById('engineeringTeam').value.trim(),
+        market_position: document.getElementById('marketPosition').value.trim(),
+        timeline: document.getElementById('timeline').value.trim()
+    };
 
     // Start debate via WebSocket
     ws.send(JSON.stringify({
@@ -782,5 +786,8 @@ function showStatus(message, type) {
 // ============================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Pre-fill question with default
+    questionInput.value = DEFAULT_QUESTION;
+
     connectWebSocket();
 });

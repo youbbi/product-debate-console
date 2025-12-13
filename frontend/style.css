@@ -792,3 +792,63 @@ body {
 .executive-card.phase-complete {
     border-color: rgba(16, 185, 129, 0.4);
 }
+
+/* ============================================================================
+   Context Form Fields
+   ============================================================================ */
+
+.context-fields {
+    margin-bottom: 20px;
+}
+
+.context-fields > label {
+    display: block;
+    margin-bottom: 12px;
+    font-weight: 500;
+    color: #cbd5e1;
+}
+
+.context-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.context-field {
+    display: flex;
+    flex-direction: column;
+}
+
+.context-field.full-width {
+    grid-column: 1 / -1;
+}
+
+.context-field label {
+    display: block;
+    font-size: 0.8em;
+    color: #94a3b8;
+    margin-bottom: 4px;
+}
+
+.context-field input {
+    width: 100%;
+    padding: 10px 12px;
+    background: rgba(15, 23, 42, 0.5);
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    border-radius: 6px;
+    color: #e2e8f0;
+    font-size: 0.9em;
+    font-family: inherit;
+}
+
+.context-field input:focus {
+    outline: none;
+    border-color: #60a5fa;
+    box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.1);
+}
+
+@media (max-width: 600px) {
+    .context-grid {
+        grid-template-columns: 1fr;
+    }
+}
