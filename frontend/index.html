@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Strategy Debate Console</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="console">
+        <!-- Header -->
+        <header class="header">
+            <h1>🚀 Executive Strategy Debate Console</h1>
+            <p class="subtitle">Real-time multi-perspective product decision-making</p>
+        </header>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Input Panel (Left) -->
+            <section class="input-panel">
+                <div class="panel-header">
+                    <h2>📝 Decision Frame</h2>
+                </div>
+                
+                <div class="form-group">
+                    <label for="question">What are we deciding?</label>
+                    <textarea
+                        id="question"
+                        placeholder="E.g., Should we build AI-powered analytics in-house or partner with a vendor?"
+                        rows="4"
+                    ></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="context">Company Context (JSON)</label>
+                    <textarea
+                        id="context"
+                        placeholder='{"company_size": "250 people", "current_revenue": "$50M ARR", "team_size": "30 engineers"}'
+                        rows="3"
+                    ></textarea>
+                </div>
+
+                <button id="startButton" class="btn btn-primary">
+                    🎬 Start Debate
+                </button>
+
+                <div id="status" class="status-message"></div>
+            </section>
+
+            <!-- Execution Panel (Right) -->
+            <section class="execution-panel">
+                <!-- Consensus Meter -->
+                <div class="consensus-container">
+                    <h3>Executive Alignment</h3>
+                    <div class="consensus-meter">
+                        <div class="meter-bar">
+                            <div id="consensusBar" class="consensus-level" style="width: 0%"></div>
+                        </div>
+                        <div class="meter-label">
+                            <span id="consensusText">Waiting...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Executive Outputs (Real-time) -->
+                <div class="executives-container">
+                    <div class="view-toggle">
+                        <h3>Executive Perspectives</h3>
+                        <button id="viewToggle" class="btn-toggle" onclick="toggleComparisonView()">
+                            Show Comparison
+                        </button>
+                    </div>
+
+                    <!-- Grid View (Default) -->
+                    <div id="executivesGrid" class="executives-grid">
+                        <!-- Dynamically populated -->
+                    </div>
+
+                    <!-- Comparison View (Hidden by default) -->
+                    <div id="comparisonView" class="comparison-view" style="display: none;">
+                        <table class="comparison-table">
+                            <thead>
+                                <tr>
+                                    <th>Category</th>
+                                    <th>CFO</th>
+                                    <th>CPO</th>
+                                    <th>CTO</th>
+                                    <th>CRO</th>
+                                </tr>
+                            </thead>
+                            <tbody id="comparisonBody">
+                                <!-- Dynamically populated -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Decision Panel (Bottom) -->
+        <section class="decision-panel" id="decisionPanel" style="display: none;">
+            <div class="panel-header">
+                <h2>✅ Final Decision</h2>
+            </div>
+            
+            <div class="decision-content">
+                <div class="recommendation-badge" id="recommendationBadge"></div>
+                
+                <div class="decision-details">
+                    <div id="decisionOutput" class="decision-output"></div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
