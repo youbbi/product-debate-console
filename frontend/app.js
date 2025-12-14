@@ -341,13 +341,62 @@ function completeExecutiveOutput(role, name, emoji, title, fullOutput) {
                 renderComparisonTable();
             }
         } catch {
-            // If not JSON, display as-is
-            displayContent = `<pre style="white-space: pre-wrap; font-size: 0.9em;">${fullOutput}</pre>`;
+            // If not valid JSON, try to extract useful info and format nicely
+            displayContent = formatMalformedOutput(fullOutput, role);
         }
 
         outputElement.innerHTML = displayContent;
         outputElement.parentElement.scrollTop = 0;
     }
+}
+
+function formatMalformedOutput(output, role) {
+    // Try to extract key information from malformed JSON
+    let html = '<div class="exec-analysis fallback-analysis">';
+
+    // Extract recommendation patterns
+    const recPatterns = {
+        cfo: /financial_recommendation["\s:]+["']?(\w+)/i,
+        cpo: /product_recommendation["\s:]+["']?(\w+)/i,
+        cto: /technology_recommendation["\s:]+["']?(\w+)/i,
+        cro: /revenue_recommendation["\s:]+["']?(\w+)/i
+    };
+
+    const recMatch = output.match(recPatterns[role] || /recommendation["\s:]+["']?(\w+)/i);
+    if (recMatch) {
+        html += `<div class="recommendation-row">
+            <span class="rec-badge ${getRecClass(recMatch[1])}">${recMatch[1].toUpperCase()}</span>
+        </div>`;
+    }
+
+    // Extract confidence level
+    const confidenceMatch = output.match(/confidence_level["\s:]+(\d+)/i);
+    if (confidenceMatch) {
+        html += `<div class="analysis-section"><p><strong>Confidence:</strong> ${confidenceMatch[1]}%</p></div>`;
+    }
+
+    // Clean up and display a summary
+    // Remove JSON syntax noise and show readable text
+    let cleanText = output
+        .replace(/[{}\[\]"]/g, ' ')  // Remove JSON brackets/quotes
+        .replace(/,\s*\n/g, '\n')    // Clean up commas
+        .replace(/:\s+/g, ': ')      // Normalize colons
+        .replace(/\s+/g, ' ')        // Collapse whitespace
+        .replace(/_/g, ' ')          // Replace underscores with spaces
+        .trim();
+
+    // Truncate if too long
+    if (cleanText.length > 800) {
+        cleanText = cleanText.substring(0, 800) + '...';
+    }
+
+    html += `<div class="analysis-section">
+        <h5>Analysis Summary</h5>
+        <p style="font-size: 0.85em; color: #94a3b8; line-height: 1.5;">${cleanText}</p>
+    </div>`;
+
+    html += '</div>';
+    return html;
 }
 
 function formatExecutiveAnalysis(data, role) {
