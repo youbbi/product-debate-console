@@ -1813,3 +1813,158 @@ body {
     color: var(--text-muted);
     font-family: 'Fira Code', monospace;
 }
+
+/* ============================================================================
+   Enhanced Final Decision Styles
+   ============================================================================ */
+
+.decision-method-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 20px;
+    padding: 10px 16px;
+    background: var(--bg);
+    border-radius: 8px;
+    font-size: 0.85em;
+}
+
+.decision-method-badge .method-label {
+    color: var(--text-muted);
+}
+
+.decision-method-badge .method-name {
+    font-weight: 600;
+    color: var(--primary);
+    padding: 4px 10px;
+    background: rgba(37, 99, 235, 0.1);
+    border-radius: 6px;
+}
+
+.decision-method-badge .model-name {
+    color: var(--text-muted);
+    padding: 4px 10px;
+    background: var(--border);
+    border-radius: 6px;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.9em;
+}
+
+.decision-section {
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+}
+
+.decision-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.decision-section h4 {
+    font-size: 0.9em;
+    color: var(--primary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+}
+
+.decision-section p {
+    line-height: 1.6;
+    color: var(--text);
+}
+
+.decision-section.disagreements h4 {
+    color: var(--warning);
+}
+
+.decision-section ul {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.decision-section li {
+    margin-bottom: 8px;
+    line-height: 1.5;
+    color: var(--text);
+}
+
+/* Executive Findings Grid */
+.exec-findings-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+}
+
+.exec-finding-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    transition: all 0.2s ease;
+}
+
+.exec-finding-card:hover {
+    border-color: var(--primary);
+}
+
+.exec-finding-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+}
+
+.exec-finding-header .exec-emoji {
+    font-size: 1.2em;
+}
+
+.exec-finding-header .exec-name {
+    font-weight: 600;
+    color: var(--text);
+    flex: 1;
+}
+
+.exec-finding-header .exec-rec {
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.7em;
+    font-weight: 700;
+}
+
+.exec-finding-content {
+    font-size: 0.85em;
+}
+
+.exec-finding-content .exec-confidence {
+    color: var(--text-muted);
+    font-size: 0.9em;
+    margin-bottom: 6px;
+}
+
+.exec-finding-content .exec-insight {
+    color: var(--text);
+    line-height: 1.5;
+    margin: 0;
+}
+
+/* Lists in decision */
+.consensus-list li {
+    color: var(--success);
+}
+
+.disagreement-list li {
+    color: var(--warning);
+}
+
+.next-steps-list li {
+    color: var(--text);
+}
+
+@media (max-width: 768px) {
+    .exec-findings-grid {
+        grid-template-columns: 1fr;
+    }
+}

@@ -204,6 +204,14 @@ function handleMessage(message) {
             completeCouncilResponse(message.provider_id, message.response, message.parsed_data);
             break;
 
+        case 'council_response_error':
+            showCouncilError(message.provider_id, message.provider_name, message.error);
+            break;
+
+        case 'council_divergence_analysis':
+            highlightDivergence(message.analysis);
+            break;
+
         case 'council_peer_review_start':
             updateCouncilStage('convergence');
             showStatus('Peer review: LLMs evaluating each other...', 'loading');
@@ -962,6 +970,12 @@ function showFinalDecision(decision) {
     let decisionData;
     try {
         decisionData = typeof decision === 'string' ? JSON.parse(decision.output) : decision;
+        // If decision.output is a string containing JSON
+        if (typeof decisionData.output === 'string') {
+            try {
+                decisionData = JSON.parse(decisionData.output);
+            } catch (e) {}
+        }
     } catch {
         decisionData = decision;
     }
@@ -971,24 +985,156 @@ function showFinalDecision(decision) {
     recommendationBadge.className = `recommendation-badge ${recType.toLowerCase()}`;
     recommendationBadge.textContent = `${recType}\n${decisionData.confidence_level || 0}%`;
 
-    // Update decision output
-    const summary = decisionData.executive_summary || decisionData.summary || 'Decision pending';
-    const nextSteps = decisionData.recommended_next_steps || [];
+    // Build comprehensive decision output
+    let output = '';
 
-    let output = `<p><strong>Executive Summary:</strong></p><p>${summary}</p>`;
+    // Method & Model info
+    const methodName = selectedMethod === 'council' ? 'LLM Council' : 'Executive Consensus';
+    output += `<div class="decision-method-badge">
+        <span class="method-label">Decided via</span>
+        <span class="method-name">${methodName}</span>
+        <span class="model-name">Azure GPT-4</span>
+    </div>`;
 
-    if (nextSteps.length > 0) {
-        output += '<p><strong>Recommended Next Steps:</strong></p><ul>';
-        nextSteps.forEach(step => {
-            output += `<li>${step}</li>`;
+    // Executive Summary
+    const summary = decisionData.executive_summary || decisionData.summary || '';
+    if (summary) {
+        output += `<div class="decision-section">
+            <h4>Executive Summary</h4>
+            <p>${summary}</p>
+        </div>`;
+    }
+
+    // Key findings from each executive
+    if (Object.keys(executiveData).length > 0) {
+        output += `<div class="decision-section">
+            <h4>Key Findings by Executive</h4>
+            <div class="exec-findings-grid">`;
+
+        EXECUTIVES.forEach(exec => {
+            const data = executiveData[exec.role];
+            if (data) {
+                const recKey = getRecKeyForRole(exec.role);
+                const execRec = data[recKey] || '';
+                const confidence = data.confidence_level || '';
+                const keyInsight = getKeyInsightForRole(data, exec.role);
+
+                output += `<div class="exec-finding-card">
+                    <div class="exec-finding-header">
+                        <span class="exec-emoji">${exec.emoji}</span>
+                        <span class="exec-name">${exec.name}</span>
+                        ${execRec ? `<span class="exec-rec ${getRecClass(execRec)}">${execRec.toUpperCase()}</span>` : ''}
+                    </div>
+                    <div class="exec-finding-content">
+                        ${confidence ? `<div class="exec-confidence">${confidence}% confident</div>` : ''}
+                        <p class="exec-insight">${keyInsight}</p>
+                    </div>
+                </div>`;
+            }
         });
-        output += '</ul>';
+        output += '</div></div>';
+    }
+
+    // Consensus points
+    const consensusPoints = decisionData.consensus_points || [];
+    if (consensusPoints.length > 0) {
+        output += `<div class="decision-section">
+            <h4>Areas of Agreement</h4>
+            <ul class="consensus-list">${consensusPoints.map(p => `<li>${formatStepItem(p)}</li>`).join('')}</ul>
+        </div>`;
+    }
+
+    // Disagreement areas
+    const disagreements = decisionData.disagreement_areas || [];
+    if (disagreements.length > 0) {
+        output += `<div class="decision-section disagreements">
+            <h4>Areas of Debate</h4>
+            <ul class="disagreement-list">${disagreements.map(d => `<li>${formatStepItem(d)}</li>`).join('')}</ul>
+        </div>`;
+    }
+
+    // Next steps
+    const nextSteps = decisionData.recommended_next_steps || decisionData.next_steps || [];
+    if (nextSteps.length > 0) {
+        output += `<div class="decision-section">
+            <h4>Recommended Next Steps</h4>
+            <ul class="next-steps-list">${nextSteps.map(step => `<li>${formatStepItem(step)}</li>`).join('')}</ul>
+        </div>`;
     }
 
     decisionOutput.innerHTML = output;
 
     // Scroll to decision panel
     decisionPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// Helper to get recommendation key based on role
+function getRecKeyForRole(role) {
+    const keys = {
+        cfo: 'financial_recommendation',
+        cpo: 'product_recommendation',
+        cto: 'technology_recommendation',
+        cro: 'revenue_recommendation'
+    };
+    return keys[role] || 'recommendation';
+}
+
+// Helper to extract key insight for each role
+function getKeyInsightForRole(data, role) {
+    switch (role) {
+        case 'cfo':
+            if (data.roi_analysis) {
+                return formatROIAnalysis(data.roi_analysis);
+            }
+            return data.budget_required || data.key_metrics?.payback_period || 'Financial analysis provided';
+        case 'cpo':
+            return `Market demand: ${data.market_demand || 'N/A'}. ${data.product_roadmap_fit || ''}`;
+        case 'cto':
+            return `Feasibility: ${data.technical_feasibility || 'N/A'}. ${formatTimeline(data.implementation_timeline)}`;
+        case 'cro':
+            return `Sales impact: ${data.sales_impact || 'N/A'}. ${data.competitive_positioning_vs_rivals || ''}`;
+        default:
+            return 'Analysis provided';
+    }
+}
+
+// Format ROI analysis object
+function formatROIAnalysis(roi) {
+    if (typeof roi === 'string') return roi;
+    if (typeof roi === 'object') {
+        const parts = [];
+        if (roi['3_year_revenue']) parts.push(`3-Year Revenue: $${(roi['3_year_revenue']/1000000).toFixed(1)}M`);
+        if (roi.roi_assessment) parts.push(roi.roi_assessment);
+        if (roi.breakeven_point) parts.push(`Breakeven: ${roi.breakeven_point}`);
+        return parts.join('. ') || JSON.stringify(roi);
+    }
+    return String(roi);
+}
+
+// Format timeline object
+function formatTimeline(timeline) {
+    if (!timeline) return '';
+    if (typeof timeline === 'string') return timeline;
+    if (typeof timeline === 'object') {
+        if (timeline.mvp) return `MVP: ${timeline.mvp}`;
+        return Object.values(timeline)[0] || '';
+    }
+    return '';
+}
+
+// Format step items (handle objects)
+function formatStepItem(item) {
+    if (typeof item === 'string') return item;
+    if (typeof item === 'object' && item !== null) {
+        // Handle various object structures
+        if (item.action) return item.action;
+        if (item.step) return item.step;
+        if (item.description) return item.description;
+        if (item.priority && item.action) return `[${item.priority}] ${item.action}`;
+        // Fallback: convert to readable format
+        return Object.entries(item).map(([k, v]) => `${k}: ${v}`).join(', ');
+    }
+    return String(item);
 }
 
 // ============================================================================
@@ -1579,7 +1725,7 @@ function showDetailModal(debate) {
                 <div class="modal-section">
                     <h4>Next Steps</h4>
                     <ul style="margin: 0; padding-left: 20px;">
-                        ${nextSteps.map(step => `<li>${escapeHtml(step)}</li>`).join('')}
+                        ${nextSteps.map(step => `<li>${escapeHtml(formatStepItem(step))}</li>`).join('')}
                     </ul>
                 </div>
             ` : ''}
@@ -1618,18 +1764,65 @@ function formatExecSummary(exec) {
     const data = exec.parsed_data;
     let summary = [];
 
-    // Extract key insights based on available fields
-    if (data.roi_analysis) summary.push(`ROI: ${typeof data.roi_analysis === 'object' ? JSON.stringify(data.roi_analysis) : data.roi_analysis}`);
-    if (data.market_demand) summary.push(`Market Demand: ${data.market_demand}`);
-    if (data.technical_feasibility) summary.push(`Feasibility: ${data.technical_feasibility}`);
-    if (data.sales_impact) summary.push(`Sales Impact: ${data.sales_impact}`);
-    if (data.confidence_level) summary.push(`Confidence: ${data.confidence_level}%`);
-
-    if (summary.length === 0) {
-        return escapeHtml(JSON.stringify(data).substring(0, 200) + '...');
+    // Extract key insights - use proper formatting for objects
+    if (data.roi_analysis) {
+        summary.push(`<strong>ROI:</strong> ${formatROIAnalysis(data.roi_analysis)}`);
+    }
+    if (data.key_metrics) {
+        summary.push(`<strong>Metrics:</strong> ${formatObjectNicely(data.key_metrics)}`);
+    }
+    if (data.market_demand) {
+        summary.push(`<strong>Market Demand:</strong> ${data.market_demand}`);
+    }
+    if (data.product_roadmap_fit) {
+        summary.push(`<strong>Roadmap Fit:</strong> ${data.product_roadmap_fit}`);
+    }
+    if (data.technical_feasibility) {
+        summary.push(`<strong>Feasibility:</strong> ${data.technical_feasibility}`);
+    }
+    if (data.implementation_timeline) {
+        summary.push(`<strong>Timeline:</strong> ${formatTimeline(data.implementation_timeline)}`);
+    }
+    if (data.sales_impact) {
+        summary.push(`<strong>Sales Impact:</strong> ${data.sales_impact}`);
+    }
+    if (data.competitive_positioning_vs_rivals) {
+        summary.push(`<strong>Competitive:</strong> ${data.competitive_positioning_vs_rivals}`);
+    }
+    if (data.confidence_level) {
+        summary.push(`<strong>Confidence:</strong> ${data.confidence_level}%`);
     }
 
-    return summary.map(s => escapeHtml(s)).join('<br>');
+    if (summary.length === 0) {
+        return formatObjectNicely(data);
+    }
+
+    return summary.join('<br>');
+}
+
+// Format any object into readable text
+function formatObjectNicely(obj) {
+    if (typeof obj === 'string') return escapeHtml(obj);
+    if (typeof obj !== 'object' || obj === null) return String(obj);
+
+    const parts = [];
+    for (const [key, value] of Object.entries(obj)) {
+        const formattedKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        let formattedValue = value;
+
+        if (typeof value === 'number') {
+            if (value > 1000000) {
+                formattedValue = `$${(value / 1000000).toFixed(1)}M`;
+            } else if (value > 1000) {
+                formattedValue = `$${(value / 1000).toFixed(0)}K`;
+            }
+        } else if (typeof value === 'object' && value !== null) {
+            formattedValue = formatObjectNicely(value);
+        }
+
+        parts.push(`${formattedKey}: ${formattedValue}`);
+    }
+    return escapeHtml(parts.slice(0, 4).join(', ') + (parts.length > 4 ? '...' : ''));
 }
 
 function escapeHtml(text) {
