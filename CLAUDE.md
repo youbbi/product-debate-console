@@ -26,6 +26,8 @@ Create `.env` in project root (not in backend/):
 - `AZURE_DEPLOYMENT_GPT4` - Deployment name (default: gpt-4-turbo)
 - `DEBUG`, `HOST`, `PORT` - Server config
 
+**Azure OpenAI Resource**: [AzureOpenAIV2](https://portal.azure.com/#@rocketyoubihotmail.onmicrosoft.com/resource/subscriptions/8ebb25f5-1d0f-484d-bfa6-a4afece74fb4/resourceGroups/rg-rocketyoubi-9733/providers/Microsoft.CognitiveServices/accounts/AzureOpenAIV2/overview)
+
 ## Architecture
 
 ### LangGraph Flow (backend/graph.py)
