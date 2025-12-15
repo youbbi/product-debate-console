@@ -1714,3 +1714,102 @@ body {
         max-height: 90vh;
     }
 }
+
+/* ============================================================================
+   Thinking Status
+   ============================================================================ */
+
+.thinking-status {
+    background: var(--surface);
+    border: 1px solid var(--primary);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.1);
+}
+
+.thinking-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 600;
+    color: var(--primary);
+    margin-bottom: 16px;
+    font-size: 1.1em;
+}
+
+.thinking-icon {
+    font-size: 1.3em;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+.thinking-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.thinking-step {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--bg);
+    border-radius: 8px;
+    font-size: 0.9em;
+    transition: all 0.3s ease;
+}
+
+.thinking-step.pending {
+    color: var(--text-muted);
+    opacity: 0.5;
+}
+
+.thinking-step.active {
+    background: rgba(37, 99, 235, 0.1);
+    color: var(--primary);
+    opacity: 1;
+}
+
+.thinking-step.complete {
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--success);
+    opacity: 1;
+}
+
+.step-icon {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-size: 0.8em;
+    flex-shrink: 0;
+}
+
+.thinking-step.pending .step-icon {
+    background: var(--border);
+    color: var(--text-muted);
+}
+
+.thinking-step.active .step-icon {
+    background: var(--primary);
+    color: white;
+    animation: pulse 1s ease-in-out infinite;
+}
+
+.thinking-step.complete .step-icon {
+    background: var(--success);
+    color: white;
+}
+
+.step-text {
+    flex: 1;
+}
+
+.step-time {
+    font-size: 0.8em;
+    color: var(--text-muted);
+    font-family: 'Fira Code', monospace;
+}

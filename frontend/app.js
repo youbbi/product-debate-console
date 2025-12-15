@@ -30,6 +30,69 @@ const EXECUTIVES = [
     { role: 'cro', name: 'Taylor Morgan', title: 'Chief Revenue Officer', emoji: '📈' }
 ];
 
+// Thinking steps for debate progress
+const THINKING_STEPS = [
+    { id: 'setup', text: 'Setting up evaluation framework', icon: '📋' },
+    { id: 'cfo', text: 'CFO analyzing financial viability', icon: '💰' },
+    { id: 'cpo', text: 'CPO analyzing product-market fit', icon: '🎯' },
+    { id: 'cto', text: 'CTO analyzing technical feasibility', icon: '⚙️' },
+    { id: 'cro', text: 'CRO analyzing revenue impact', icon: '📈' },
+    { id: 'consensus', text: 'Building executive consensus', icon: '🤝' },
+    { id: 'synthesis', text: 'Synthesizing final recommendation', icon: '✨' }
+];
+let activeThinkingSteps = {};
+
+// ============================================================================
+// Thinking Status Functions
+// ============================================================================
+
+function showThinkingStatus() {
+    const container = document.getElementById('thinkingStatus');
+    const stepsEl = document.getElementById('thinkingSteps');
+    if (!container || !stepsEl) return;
+
+    activeThinkingSteps = {};
+    let html = '';
+    THINKING_STEPS.forEach(step => {
+        activeThinkingSteps[step.id] = 'pending';
+        html += `
+            <div class="thinking-step pending" id="thinking-${step.id}">
+                <div class="step-icon">${step.icon}</div>
+                <span class="step-text">${step.text}</span>
+                <span class="step-time" id="time-${step.id}"></span>
+            </div>
+        `;
+    });
+    stepsEl.innerHTML = html;
+    container.style.display = 'block';
+
+    // Start the first step
+    updateThinkingStep('setup', 'active');
+}
+
+function updateThinkingStep(stepId, status) {
+    const stepEl = document.getElementById(`thinking-${stepId}`);
+    const timeEl = document.getElementById(`time-${stepId}`);
+    if (!stepEl) return;
+
+    activeThinkingSteps[stepId] = status;
+    stepEl.className = `thinking-step ${status}`;
+
+    if (status === 'active') {
+        // Mark as active with current time
+        if (timeEl) timeEl.textContent = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    } else if (status === 'complete') {
+        // Update icon to checkmark
+        const iconEl = stepEl.querySelector('.step-icon');
+        if (iconEl) iconEl.textContent = '✓';
+    }
+}
+
+function hideThinkingStatus() {
+    const container = document.getElementById('thinkingStatus');
+    if (container) container.style.display = 'none';
+}
+
 // ============================================================================
 // WebSocket Setup
 // ============================================================================
@@ -68,6 +131,7 @@ function handleMessage(message) {
     switch (message.type) {
         case 'debate_started':
             initializeDebateUI(message.method || selectedMethod);
+            showThinkingStatus();  // Show thinking steps
             const methodLabel = message.method === 'council' ? 'LLM Council' :
                                message.method === 'both' ? 'Both methods' : 'Executive Consensus';
             showStatus(`${methodLabel} starting...`, 'loading');
@@ -75,6 +139,8 @@ function handleMessage(message) {
 
         case 'exec_started':
             initExecutivePhase(message.role, message.input_summary, message.timestamp);
+            // Update thinking step for this exec
+            updateThinkingStep(message.role, 'active');
             showStatus(`${message.name} starting analysis...`, 'loading');
             break;
 
@@ -89,22 +155,32 @@ function handleMessage(message) {
         case 'exec_complete':
             updatePhase(message.role, 'complete', message.timestamp);
             completeExecutiveOutput(message.role, message.name, message.emoji, message.title, message.output);
+            // Mark this exec's thinking step complete
+            updateThinkingStep(message.role, 'complete');
             showStatus(`${message.name} analysis complete`, 'success');
             break;
 
         case 'consensus_update':
             updateConsensus(message.consensus);
+            // Mark consensus step active/complete
+            updateThinkingStep('consensus', 'complete');
+            updateThinkingStep('synthesis', 'active');
             break;
 
         case 'final_decision':
+            updateThinkingStep('synthesis', 'complete');
+            hideThinkingStatus();  // Hide thinking panel
             showFinalDecision(message.decision);
             break;
 
         case 'context_established':
             console.log('Evaluation lenses:', message.lenses);
+            // Mark setup complete, execs will start soon
+            updateThinkingStep('setup', 'complete');
             break;
 
         case 'error':
+            hideThinkingStatus();  // Hide on error
             showStatus(`Error: ${message.message}`, 'error');
             debateInProgress = false;
             startButton.disabled = false;
@@ -115,7 +191,7 @@ function handleMessage(message) {
         // ============================================================================
 
         case 'council_divergence_start':
-            initializeCouncilUI(message.providers);
+            initializeCouncilUI(message.providers, message.provider_names);
             updateCouncilStage('divergence');
             showStatus('Council divergence: LLMs analyzing...', 'loading');
             break;
@@ -919,7 +995,7 @@ function showFinalDecision(decision) {
 // Council UI Functions
 // ============================================================================
 
-function initializeCouncilUI(providers) {
+function initializeCouncilUI(providers, providerNames = {}) {
     const grid = document.getElementById('councilResponses');
     if (!grid) return;
 
@@ -927,8 +1003,10 @@ function initializeCouncilUI(providers) {
     councilData = {};
 
     providers.forEach((providerId, index) => {
-        councilData[providerId] = { response: '', complete: false, scores: {} };
-        const card = createCouncilCard(providerId, `LLM ${index + 1}`);
+        // Use actual provider name if available, otherwise fallback to generic label
+        const label = providerNames[providerId] || `LLM ${index + 1}`;
+        councilData[providerId] = { response: '', complete: false, scores: {}, name: label };
+        const card = createCouncilCard(providerId, label);
         grid.appendChild(card);
     });
 }
@@ -967,10 +1045,22 @@ function updateCouncilResponse(providerId, token, streaming) {
 function completeCouncilResponse(providerId, response, parsedData) {
     const card = document.getElementById(`council-${providerId}`);
     const statusEl = card?.querySelector('.council-status');
+    const outputEl = document.getElementById(`council-output-${providerId}`);
 
     if (statusEl) {
         statusEl.textContent = 'Complete';
         statusEl.classList.add('complete');
+    }
+
+    // Render the response to the DOM
+    if (outputEl) {
+        // Format the response nicely
+        if (parsedData) {
+            outputEl.innerHTML = formatCouncilResponse(parsedData);
+        } else {
+            // Clean up raw response text
+            outputEl.textContent = response;
+        }
     }
 
     if (councilData[providerId]) {
@@ -978,6 +1068,56 @@ function completeCouncilResponse(providerId, response, parsedData) {
         councilData[providerId].complete = true;
         councilData[providerId].parsed = parsedData;
     }
+}
+
+function formatCouncilResponse(data) {
+    let html = '<div class="council-analysis">';
+
+    // Show recommendation if present
+    const rec = data.recommendation || data.overall_recommendation;
+    if (rec) {
+        const recClass = getRecClass(rec);
+        html += `<div class="recommendation-row">
+            <span class="rec-badge ${recClass}">${rec.toUpperCase()}</span>
+            ${data.confidence_level ? `<span class="confidence">${data.confidence_level}% confident</span>` : ''}
+        </div>`;
+    }
+
+    // Show key reasoning
+    if (data.key_reasoning || data.rationale) {
+        html += `<div class="analysis-section">
+            <h5>Key Reasoning</h5>
+            <p>${data.key_reasoning || data.rationale}</p>
+        </div>`;
+    }
+
+    // Show pros/cons if available
+    if (data.pros && data.pros.length > 0) {
+        html += '<div class="analysis-section"><h5>Pros</h5><ul>';
+        data.pros.forEach(p => html += `<li>${p}</li>`);
+        html += '</ul></div>';
+    }
+
+    if (data.cons && data.cons.length > 0) {
+        html += '<div class="analysis-section"><h5>Cons</h5><ul>';
+        data.cons.forEach(c => html += `<li>${c}</li>`);
+        html += '</ul></div>';
+    }
+
+    // Show risks if available
+    if (data.risks && data.risks.length > 0) {
+        html += '<div class="analysis-section risks"><h5>Risks</h5><ul>';
+        data.risks.forEach(r => html += `<li class="risk-item">${r}</li>`);
+        html += '</ul></div>';
+    }
+
+    // Fallback to JSON display if no structured data
+    if (html === '<div class="council-analysis">') {
+        html += `<pre style="white-space: pre-wrap; font-size: 0.85em;">${JSON.stringify(data, null, 2)}</pre>`;
+    }
+
+    html += '</div>';
+    return html;
 }
 
 function updateCouncilStage(stage) {
@@ -1015,8 +1155,10 @@ function updatePeerReview(reviewerId, targetId, score) {
         scoresEl.appendChild(scoreItem);
     }
 
+    // Use provider name if available
+    const reviewerName = councilData[reviewerId]?.name || reviewerId;
     const scoreClass = score >= 7 ? 'high' : score >= 4 ? 'medium' : 'low';
-    scoreItem.innerHTML = `<span class="reviewer">${reviewerId}:</span> <span class="score ${scoreClass}">${score}/10</span>`;
+    scoreItem.innerHTML = `<span class="reviewer">${reviewerName}:</span> <span class="score ${scoreClass}">${score}/10</span>`;
 
     // Store in councilData
     if (councilData[targetId]) {
@@ -1044,8 +1186,10 @@ function renderRatingMatrix(matrix) {
         const isHighest = item.id === matrix.highest_rated;
         const isLowest = item.id === matrix.lowest_rated;
         const rowClass = isHighest ? 'highest' : isLowest ? 'lowest' : '';
+        // Use provider name from councilData if available
+        const displayName = councilData[item.id]?.name || item.id;
         html += `<tr class="${rowClass}">
-            <td>${item.id}</td>
+            <td>${displayName}</td>
             <td><span class="score-badge">${item.score.toFixed(1)}</span></td>
             <td>#${i + 1}${isHighest ? ' (Chairman)' : ''}</td>
         </tr>`;

@@ -289,13 +289,24 @@ Output JSON with keys:
         try:
             executives_data = {}
             for output in result.get('executive_outputs', []):
-                executives_data[output.role] = {
-                    'name': output.name,
-                    'title': output.title,
-                    'emoji': output.emoji,
-                    'output': output.output,
-                    'parsed_data': output.parsed_data
-                }
+                # Handle both dict and NamedTuple access (LangGraph may convert to dict)
+                if isinstance(output, dict):
+                    role = output['role']
+                    executives_data[role] = {
+                        'name': output['name'],
+                        'title': output['title'],
+                        'emoji': output['emoji'],
+                        'output': output['output'],
+                        'parsed_data': output.get('parsed_data')
+                    }
+                else:
+                    executives_data[output.role] = {
+                        'name': output.name,
+                        'title': output.title,
+                        'emoji': output.emoji,
+                        'output': output.output,
+                        'parsed_data': output.parsed_data
+                    }
 
             save_debate({
                 'id': session_id,
