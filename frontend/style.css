@@ -163,6 +163,34 @@ body {
     transform: translateY(0);
 }
 
+/* Button Group */
+.button-group {
+    display: flex;
+    gap: 12px;
+    margin: 20px 0;
+}
+
+.button-group .btn {
+    margin: 0;
+    flex: 1;
+}
+
+/* Stop Button */
+.btn-stop {
+    background: var(--error);
+    color: white;
+}
+
+.btn-stop:hover {
+    background: #dc2626;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);
+}
+
+.btn-stop:active {
+    transform: translateY(0);
+}
+
 /* Status Message */
 .status-message {
     padding: 12px;
@@ -911,18 +939,35 @@ body {
 }
 
 /* ============================================================================
-   Header Links
+   Header Navigation
    ============================================================================ */
+
+.header-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 20px;
+    gap: 16px;
+    flex-wrap: wrap;
+}
 
 .header-links {
     display: flex;
-    gap: 20px;
-    justify-content: center;
-    margin-top: 15px;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
 }
 
 .header-links .how-it-works-link {
     margin-top: 0;
+    padding: 8px 16px;
+    background: rgba(37, 99, 235, 0.08);
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.header-links .how-it-works-link:hover {
+    background: rgba(37, 99, 235, 0.15);
 }
 
 /* ============================================================================
@@ -977,10 +1022,71 @@ body {
 }
 
 .method-description {
-    font-size: 0.8em;
+    font-size: 0.85em;
     color: var(--text-muted);
-    font-style: italic;
+    line-height: 1.5;
     margin-bottom: 12px;
+}
+
+.method-guidance {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 16px;
+    font-size: 0.85em;
+}
+
+.method-guidance-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.method-guidance-toggle:hover {
+    color: var(--primary);
+}
+
+.method-guidance-content {
+    display: none;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+}
+
+.method-guidance-content.expanded {
+    display: block;
+}
+
+.guidance-section {
+    margin-bottom: 14px;
+}
+
+.guidance-section:last-child {
+    margin-bottom: 0;
+}
+
+.guidance-section h5 {
+    font-size: 0.9em;
+    color: var(--text);
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.guidance-section ul {
+    margin: 0;
+    padding-left: 20px;
+    color: var(--text-muted);
+}
+
+.guidance-section li {
+    margin-bottom: 4px;
+    line-height: 1.4;
 }
 
 .cost-estimate {
@@ -1065,6 +1171,7 @@ body {
 .council-stage-indicator .stage.active .stage-number {
     background: var(--primary);
     color: white;
+    animation: pulse 1.5s ease-in-out infinite;
 }
 
 .council-stage-indicator .stage.active .stage-name {
@@ -1142,9 +1249,11 @@ body {
     border-bottom: 1px solid var(--border);
 }
 
-.council-label {
+.council-provider-name {
     font-weight: 600;
+    font-size: 1em;
     color: var(--text);
+    transition: color 0.3s ease;
 }
 
 .council-status {
@@ -1421,9 +1530,18 @@ body {
         height: 16px;
     }
 
+    .header-nav {
+        flex-direction: column;
+        justify-content: center;
+    }
+
     .header-links {
         flex-direction: column;
         gap: 10px;
+    }
+
+    .history-btn {
+        width: 100%;
     }
 }
 
@@ -1432,21 +1550,23 @@ body {
    ============================================================================ */
 
 .history-btn {
-    padding: 8px 16px;
-    background: rgba(37, 99, 235, 0.1);
-    border: 1px solid var(--primary);
-    border-radius: 8px;
-    color: var(--primary);
-    font-size: 0.9em;
-    font-weight: 500;
+    padding: 12px 24px;
+    background: var(--primary);
+    border: none;
+    border-radius: 10px;
+    color: white;
+    font-size: 1em;
+    font-weight: 600;
     cursor: pointer;
     transition: all 0.2s ease;
     font-family: inherit;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
 }
 
 .history-btn:hover {
-    background: var(--primary);
-    color: white;
+    background: var(--primary-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
 }
 
 .history-overlay {
@@ -1586,6 +1706,23 @@ body {
     color: var(--error);
 }
 
+.history-item-method {
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 0.75em;
+    font-weight: 600;
+}
+
+.history-item-method.consensus {
+    background: rgba(37, 99, 235, 0.1);
+    color: var(--primary);
+}
+
+.history-item-method.council {
+    background: rgba(139, 92, 246, 0.1);
+    color: #8b5cf6;
+}
+
 .history-item-question {
     font-size: 0.9em;
     color: var(--text);
@@ -1644,6 +1781,25 @@ body {
     margin: 0;
     font-size: 1.1em;
     color: var(--text);
+    flex: 1;
+}
+
+.modal-method-badge {
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.85em;
+    font-weight: 600;
+    margin-right: auto;
+}
+
+.modal-method-badge.consensus {
+    background: rgba(37, 99, 235, 0.1);
+    color: var(--primary);
+}
+
+.modal-method-badge.council {
+    background: rgba(139, 92, 246, 0.1);
+    color: #8b5cf6;
 }
 
 .modal-body {
@@ -1966,5 +2122,247 @@ body {
 @media (max-width: 768px) {
     .exec-findings-grid {
         grid-template-columns: 1fr;
+    }
+}
+
+/* ============================================================================
+   Council Divergence Highlighting
+   ============================================================================ */
+
+/* Agreement/Divergence Card States */
+.council-card.agrees {
+    border-color: var(--success);
+    box-shadow: 0 0 0 1px var(--success), 0 4px 12px rgba(16, 185, 129, 0.15);
+}
+
+.council-card.agrees .council-provider-name {
+    color: var(--success);
+}
+
+.council-card.diverges {
+    border-color: var(--warning);
+    box-shadow: 0 0 0 1px var(--warning), 0 4px 12px rgba(245, 158, 11, 0.15);
+}
+
+.council-card.diverges .council-provider-name {
+    color: var(--warning);
+}
+
+/* Error State */
+.council-card.has-error {
+    border-color: var(--error);
+    box-shadow: 0 0 0 1px var(--error), 0 4px 12px rgba(239, 68, 68, 0.15);
+    background: rgba(239, 68, 68, 0.02);
+}
+
+.council-status.error {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--error);
+}
+
+.council-error {
+    padding: 12px;
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid var(--error);
+    border-radius: 8px;
+    color: var(--error);
+    font-size: 0.85em;
+    margin-top: 8px;
+}
+
+.council-error::before {
+    content: "⚠️ ";
+}
+
+/* Recommendation Indicator Badge */
+.rec-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.7em;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-left: auto;
+}
+
+.rec-indicator.go {
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--success);
+}
+
+.rec-indicator.pivot {
+    background: rgba(245, 158, 11, 0.15);
+    color: var(--warning);
+}
+
+.rec-indicator.hold {
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--error);
+}
+
+.rec-indicator.unknown {
+    background: var(--border);
+    color: var(--text-muted);
+}
+
+/* Divergence Summary Panel */
+.divergence-summary {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.divergence-summary .summary-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.divergence-summary .summary-icon {
+    font-size: 1.5em;
+}
+
+.divergence-summary .summary-text {
+    font-size: 0.95em;
+    color: var(--text);
+}
+
+.divergence-summary .summary-text strong {
+    color: var(--primary);
+}
+
+.divergence-summary .agreement-stats {
+    display: flex;
+    gap: 16px;
+    font-size: 0.85em;
+}
+
+.divergence-summary .stat {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.divergence-summary .stat-label {
+    color: var(--text-muted);
+}
+
+.divergence-summary .stat-value {
+    font-weight: 600;
+}
+
+.divergence-summary .stat-value.agreeing {
+    color: var(--success);
+}
+
+.divergence-summary .stat-value.diverging {
+    color: var(--warning);
+}
+
+/* Agreement Badge */
+.agreement-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.85em;
+    font-weight: 600;
+}
+
+.agreement-badge.full {
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--success);
+    border: 1px solid var(--success);
+}
+
+.agreement-badge.full::before {
+    content: "✓";
+}
+
+.agreement-badge.partial {
+    background: rgba(245, 158, 11, 0.1);
+    color: var(--warning);
+    border: 1px solid var(--warning);
+}
+
+.agreement-badge.partial::before {
+    content: "⚡";
+}
+
+/* Majority recommendation highlight */
+.majority-rec {
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.majority-rec.go {
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--success);
+}
+
+.majority-rec.pivot {
+    background: rgba(245, 158, 11, 0.15);
+    color: var(--warning);
+}
+
+.majority-rec.hold {
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--error);
+}
+
+/* Confidence spread indicator */
+.confidence-spread {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85em;
+    color: var(--text-muted);
+}
+
+.confidence-spread .spread-bar {
+    width: 60px;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.confidence-spread .spread-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.3s ease;
+}
+
+.confidence-spread .spread-fill.low {
+    background: var(--success);
+}
+
+.confidence-spread .spread-fill.medium {
+    background: var(--warning);
+}
+
+.confidence-spread .spread-fill.high {
+    background: var(--error);
+}
+
+@media (max-width: 768px) {
+    .divergence-summary {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .divergence-summary .agreement-stats {
+        flex-wrap: wrap;
     }
 }

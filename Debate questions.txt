@@ -1,6 +1,7 @@
 Should I pursue building my own application, which is a meal planning it's aimed for B2C. I think the unique advantage is how it's personalising the meal suggestions based on your preferences. It's smart, it always kind of anticipates your needs, it can parse any type of recipes and generates automatically your weekly meal plan based on all your most preferred recipes.
 So my question to this group is: We're a small start-up and it's a very crowded market, so is there any way we can make money out of this application? 
 
+
 Company context:
 {
   "company_size": "2 people",

@@ -241,6 +241,67 @@ Output your synthesis as JSON:
         )
 
     @staticmethod
+    def analyze_divergence(responses: List[LLMResponse]) -> Dict:
+        """Analyze divergence between LLM responses to highlight agreements/disagreements"""
+        recommendations = {}
+        confidence_levels = {}
+        summaries = {}
+
+        for resp in responses:
+            provider_id = resp['provider_id']
+            if resp['parsed_data']:
+                rec = resp['parsed_data'].get('recommendation', '').upper()
+                conf = resp['parsed_data'].get('confidence_level', 0)
+                summary = resp['parsed_data'].get('executive_summary', '')
+                recommendations[provider_id] = rec
+                confidence_levels[provider_id] = conf
+                summaries[provider_id] = summary
+            else:
+                recommendations[provider_id] = 'UNKNOWN'
+                confidence_levels[provider_id] = 0
+                summaries[provider_id] = ''
+
+        # Calculate agreement
+        rec_values = [r for r in recommendations.values() if r != 'UNKNOWN']
+        if rec_values:
+            from collections import Counter
+            rec_counts = Counter(rec_values)
+            majority_recommendation = rec_counts.most_common(1)[0][0]
+            all_agree = len(set(rec_values)) == 1
+        else:
+            majority_recommendation = None
+            all_agree = False
+
+        # Identify divergent providers
+        divergent_providers = [
+            p for p, r in recommendations.items()
+            if r != 'UNKNOWN' and r != majority_recommendation
+        ] if majority_recommendation else []
+
+        agreeing_providers = [
+            p for p, r in recommendations.items()
+            if r == majority_recommendation
+        ] if majority_recommendation else []
+
+        # Calculate confidence spread
+        conf_values = [c for c in confidence_levels.values() if c > 0]
+        confidence_spread = max(conf_values) - min(conf_values) if len(conf_values) >= 2 else 0
+
+        return {
+            "recommendations": recommendations,
+            "confidence_levels": confidence_levels,
+            "summaries": summaries,
+            "recommendation_agreement": all_agree,
+            "majority_recommendation": majority_recommendation,
+            "divergent_providers": divergent_providers,
+            "agreeing_providers": agreeing_providers,
+            "confidence_spread": confidence_spread,
+            "total_providers": len(responses),
+            "agreeing_count": len(agreeing_providers),
+            "diverging_count": len(divergent_providers)
+        }
+
+    @staticmethod
     def build_divergence_prompt(query: str, context: Dict) -> str:
         """Create the prompt sent to all LLMs during divergence stage"""
         return f"""You are an AI advisor analyzing a product decision. Provide a thorough, well-reasoned analysis.

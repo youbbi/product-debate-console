@@ -16,10 +16,12 @@
         <header class="header">
             <h1>🚀 Executive Strategy Debate Console</h1>
             <p class="subtitle">Real-time multi-perspective product decision-making</p>
-            <div class="header-links">
-                <a href="/framework" class="how-it-works-link">Consensus Framework →</a>
-                <a href="/council-framework" class="how-it-works-link">LLM Council Framework →</a>
-                <button class="history-btn" onclick="toggleHistoryPanel()">📜 History</button>
+            <div class="header-nav">
+                <div class="header-links">
+                    <a href="/framework" class="how-it-works-link">🤝 How Consensus Works</a>
+                    <a href="/council-framework" class="how-it-works-link">🧠 How LLM Council Works</a>
+                </div>
+                <button class="history-btn" id="historyBtn" onclick="toggleHistoryPanel()">📜 View History</button>
             </div>
         </header>
 
@@ -34,6 +36,21 @@
             </div>
         </div>
         <div id="historyOverlay" class="history-overlay" onclick="toggleHistoryPanel()"></div>
+
+        <!-- Decision Panel (shows at top when complete) -->
+        <section class="decision-panel" id="decisionPanel" style="display: none;">
+            <div class="panel-header">
+                <h2>✅ Final Decision</h2>
+            </div>
+
+            <div class="decision-content">
+                <div class="recommendation-badge" id="recommendationBadge"></div>
+
+                <div class="decision-details">
+                    <div id="decisionOutput" class="decision-output"></div>
+                </div>
+            </div>
+        </section>
 
         <!-- Main Content -->
         <div class="main-content">
@@ -81,6 +98,43 @@
                 <!-- Method Selector -->
                 <div class="method-selector">
                     <label>Decision Method</label>
+
+                    <!-- When to Use Guidance -->
+                    <div class="method-guidance">
+                        <div class="method-guidance-toggle" onclick="toggleGuidance()">
+                            <span>💡 When to use each method?</span>
+                            <span id="guidanceArrow">▼</span>
+                        </div>
+                        <div class="method-guidance-content" id="guidanceContent">
+                            <div class="guidance-section">
+                                <h5>🤝 Executive Consensus</h5>
+                                <ul>
+                                    <li>You want domain-specific analysis (financial, product, technical, revenue)</li>
+                                    <li>Cost efficiency is a priority</li>
+                                    <li>You trust the underlying LLM's general reasoning</li>
+                                    <li>You want faster results (single provider, parallel execution)</li>
+                                </ul>
+                            </div>
+                            <div class="guidance-section">
+                                <h5>🧠 LLM Council</h5>
+                                <ul>
+                                    <li>The decision is high-stakes and you want multiple perspectives</li>
+                                    <li>You're concerned about model-specific biases or blind spots</li>
+                                    <li>You want to see how different AI models approach the same problem</li>
+                                    <li>You value the peer review process for quality assurance</li>
+                                </ul>
+                            </div>
+                            <div class="guidance-section">
+                                <h5>⚖️ Both (Compare)</h5>
+                                <ul>
+                                    <li>The decision is critical and you want maximum confidence</li>
+                                    <li>You want to validate one method's recommendation against another</li>
+                                    <li>You're curious about how different approaches affect the outcome</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="method-toggle">
                         <button class="method-btn active" data-method="consensus">
                             Executive Consensus
@@ -93,7 +147,7 @@
                         </button>
                     </div>
                     <p class="method-description" id="methodDescription">
-                        4 AI executives debate from their specialized perspectives
+                        🤝 4 AI executives (CFO, CPO, CTO, CRO) analyze your decision from their specialized perspectives, then synthesize a unified recommendation
                     </p>
                     <div class="cost-estimate" id="costEstimate">
                         <span class="cost-label">Estimated cost:</span>
@@ -101,9 +155,14 @@
                     </div>
                 </div>
 
-                <button id="startButton" class="btn btn-primary">
-                    🎬 Start Debate
-                </button>
+                <div class="button-group">
+                    <button id="startButton" class="btn btn-primary">
+                        🎬 Start Debate
+                    </button>
+                    <button id="stopButton" class="btn btn-stop" style="display: none;">
+                        ⏹️ Stop
+                    </button>
+                </div>
 
                 <div id="status" class="status-message"></div>
             </section>
@@ -270,21 +329,6 @@
                 </div>
             </section>
         </div>
-
-        <!-- Decision Panel (Bottom) -->
-        <section class="decision-panel" id="decisionPanel" style="display: none;">
-            <div class="panel-header">
-                <h2>✅ Final Decision</h2>
-            </div>
-            
-            <div class="decision-content">
-                <div class="recommendation-badge" id="recommendationBadge"></div>
-                
-                <div class="decision-details">
-                    <div id="decisionOutput" class="decision-output"></div>
-                </div>
-            </div>
-        </section>
     </div>
 
     <script src="/static/app.js"></script>

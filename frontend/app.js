@@ -7,6 +7,7 @@ let isComparisonView = false;
 let selectedMethod = 'consensus';  // 'consensus', 'council', or 'both'
 let councilData = {};  // Store council LLM responses for visualization
 let councilStage = null;  // Current stage: 'divergence', 'convergence', 'synthesis'
+let availableProviders = [];  // Store provider info for model display
 
 // Default question from Debate questions.txt
 const DEFAULT_QUESTION = `Should I pursue building my own application, which is a meal planning it's aimed for B2C. I think the unique advantage is how it's personalising the meal suggestions based on your preferences. It's smart, it always kind of anticipates your needs, it can parse any type of recipes and generates automatically your weekly meal plan based on all your most preferred recipes.
@@ -14,6 +15,7 @@ So my question to this group is: We're a small start-up and it's a very crowded 
 
 // DOM Elements
 const startButton = document.getElementById('startButton');
+const stopButton = document.getElementById('stopButton');
 const questionInput = document.getElementById('question');
 const statusMessage = document.getElementById('status');
 const executivesGrid = document.getElementById('executivesGrid');
@@ -131,7 +133,10 @@ function handleMessage(message) {
     switch (message.type) {
         case 'debate_started':
             initializeDebateUI(message.method || selectedMethod);
-            showThinkingStatus();  // Show thinking steps
+            // Only show thinking status for consensus method (council has its own stage UI)
+            if (message.method !== 'council') {
+                showThinkingStatus();
+            }
             const methodLabel = message.method === 'council' ? 'LLM Council' :
                                message.method === 'both' ? 'Both methods' : 'Executive Consensus';
             showStatus(`${methodLabel} starting...`, 'loading');
@@ -184,6 +189,15 @@ function handleMessage(message) {
             showStatus(`Error: ${message.message}`, 'error');
             debateInProgress = false;
             startButton.disabled = false;
+            stopButton.style.display = 'none';
+            break;
+
+        case 'debate_cancelled':
+            hideThinkingStatus();
+            showStatus('Debate cancelled', 'error');
+            debateInProgress = false;
+            startButton.disabled = false;
+            stopButton.style.display = 'none';
             break;
 
         // ============================================================================
@@ -259,6 +273,7 @@ function handleMessage(message) {
 function initializeDebateUI(method = 'consensus') {
     debateInProgress = true;
     startButton.disabled = true;
+    stopButton.style.display = 'inline-block';
     decisionPanel.style.display = 'none';
     executiveData = {};  // Reset stored data
     executivePhases = {};  // Reset phase tracking
@@ -962,6 +977,7 @@ function updateConsensus(consensus) {
 function showFinalDecision(decision) {
     debateInProgress = false;
     startButton.disabled = false;
+    stopButton.style.display = 'none';
     showStatus('Debate complete!', 'success');
 
     decisionPanel.style.display = 'block';
@@ -990,10 +1006,11 @@ function showFinalDecision(decision) {
 
     // Method & Model info
     const methodName = selectedMethod === 'council' ? 'LLM Council' : 'Executive Consensus';
+    const modelNames = getModelNamesForMethod(selectedMethod);
     output += `<div class="decision-method-badge">
         <span class="method-label">Decided via</span>
         <span class="method-name">${methodName}</span>
-        <span class="model-name">Azure GPT-4</span>
+        <span class="model-name">${modelNames}</span>
     </div>`;
 
     // Executive Summary
@@ -1137,6 +1154,33 @@ function formatStepItem(item) {
     return String(item);
 }
 
+// Get model names for the selected method
+function getModelNamesForMethod(method) {
+    if (method === 'council' && availableProviders.length > 0) {
+        // For council: show all provider models
+        return availableProviders.map(p => p.model || p.name).join(', ');
+    } else if (method === 'consensus') {
+        // For consensus: use Azure GPT-4 (from first provider or default)
+        const azure = availableProviders.find(p => p.id === 'azure');
+        return azure ? azure.model : 'GPT-4 Turbo';
+    }
+    return 'GPT-4 Turbo';
+}
+
+// Fetch available providers info
+async function fetchProviders() {
+    try {
+        const response = await fetch('/api/providers');
+        const data = await response.json();
+        if (data.providers) {
+            availableProviders = data.providers;
+            console.log('Available providers:', availableProviders);
+        }
+    } catch (error) {
+        console.error('Failed to fetch providers:', error);
+    }
+}
+
 // ============================================================================
 // Council UI Functions
 // ============================================================================
@@ -1163,7 +1207,7 @@ function createCouncilCard(providerId, label) {
     card.id = `council-${providerId}`;
     card.innerHTML = `
         <div class="council-header">
-            <span class="council-label">${label}</span>
+            <span class="council-provider-name">${label}</span>
             <span class="council-status">Thinking...</span>
         </div>
         <div class="council-output" id="council-output-${providerId}">
@@ -1266,6 +1310,120 @@ function formatCouncilResponse(data) {
     return html;
 }
 
+function showCouncilError(providerId, providerName, error) {
+    const card = document.getElementById(`council-${providerId}`);
+    const outputEl = document.getElementById(`council-output-${providerId}`);
+    const statusEl = card?.querySelector('.council-status');
+
+    if (statusEl) {
+        statusEl.textContent = 'Error';
+        statusEl.classList.add('error');
+    }
+
+    if (outputEl) {
+        outputEl.innerHTML = `
+            <div class="council-error">
+                <div class="error-icon">⚠️</div>
+                <div class="error-message">
+                    <strong>${providerName || providerId} failed:</strong>
+                    <p>${error}</p>
+                </div>
+            </div>
+        `;
+    }
+
+    if (card) {
+        card.classList.add('has-error');
+    }
+
+    // Update councilData
+    if (councilData[providerId]) {
+        councilData[providerId].error = error;
+        councilData[providerId].complete = true;
+    }
+}
+
+function highlightDivergence(analysis) {
+    // analysis contains: recommendations, majority_recommendation, divergent_providers, agreeing_providers
+
+    // Show divergence summary
+    showDivergenceSummary(analysis);
+
+    // Highlight individual cards
+    Object.keys(analysis.recommendations).forEach(providerId => {
+        const card = document.getElementById(`council-${providerId}`);
+        if (!card) return;
+
+        const rec = analysis.recommendations[providerId];
+        const isDivergent = analysis.divergent_providers.includes(providerId);
+        const isAgreeing = analysis.agreeing_providers.includes(providerId);
+
+        // Remove existing classes
+        card.classList.remove('agrees', 'diverges');
+
+        if (isDivergent) {
+            card.classList.add('diverges');
+        } else if (isAgreeing) {
+            card.classList.add('agrees');
+        }
+
+        // Add recommendation badge to card header
+        const header = card.querySelector('.council-header');
+        if (header && rec !== 'UNKNOWN') {
+            let badge = header.querySelector('.rec-indicator');
+            if (!badge) {
+                badge = document.createElement('span');
+                badge.className = 'rec-indicator';
+                header.appendChild(badge);
+            }
+            const badgeClass = rec === 'GO' ? 'rec-go' : rec === 'PIVOT' ? 'rec-pivot' : 'rec-hold';
+            badge.className = `rec-indicator ${badgeClass}`;
+            badge.textContent = rec;
+        }
+    });
+}
+
+function showDivergenceSummary(analysis) {
+    // Create or update divergence summary panel
+    let summaryEl = document.getElementById('divergenceSummary');
+
+    if (!summaryEl) {
+        // Create summary element after council responses grid
+        const councilResponses = document.getElementById('councilResponses');
+        if (!councilResponses) return;
+
+        summaryEl = document.createElement('div');
+        summaryEl.id = 'divergenceSummary';
+        summaryEl.className = 'divergence-summary';
+        councilResponses.after(summaryEl);
+    }
+
+    const { recommendation_agreement, majority_recommendation, agreeing_count, diverging_count, confidence_spread } = analysis;
+
+    let html = '<div class="divergence-header">';
+
+    if (recommendation_agreement) {
+        html += `
+            <span class="agreement-badge full">Full Agreement</span>
+            <span class="majority-rec">All LLMs recommend: <strong>${majority_recommendation}</strong></span>
+        `;
+    } else {
+        html += `
+            <span class="agreement-badge partial">Divergence Detected</span>
+            <span class="majority-rec">Majority (${agreeing_count}/${agreeing_count + diverging_count}): <strong>${majority_recommendation}</strong></span>
+        `;
+    }
+
+    if (confidence_spread > 20) {
+        html += `<span class="confidence-spread">Confidence spread: ${confidence_spread}%</span>`;
+    }
+
+    html += '</div>';
+
+    summaryEl.innerHTML = html;
+    summaryEl.style.display = 'block';
+}
+
 function updateCouncilStage(stage) {
     councilStage = stage;
 
@@ -1348,6 +1506,7 @@ function renderRatingMatrix(matrix) {
 function showCouncilDecision(decision, chairmanProvider) {
     debateInProgress = false;
     startButton.disabled = false;
+    stopButton.style.display = 'none';
     showStatus('Council decision complete!', 'success');
 
     decisionPanel.style.display = 'block';
@@ -1357,24 +1516,97 @@ function showCouncilDecision(decision, chairmanProvider) {
     recommendationBadge.className = `recommendation-badge ${recType.toLowerCase()}`;
     recommendationBadge.textContent = `${recType}\n${decision.confidence_level || 0}%`;
 
-    // Update decision output
-    let output = `<p><strong>Chairman:</strong> ${chairmanProvider}</p>`;
-    output += `<p><strong>Executive Summary:</strong></p><p>${decision.executive_summary || decision.weighted_reasoning || ''}</p>`;
+    // Build comprehensive decision output (matching consensus style)
+    let output = '';
 
-    if (decision.key_insights && decision.key_insights.length > 0) {
-        output += '<p><strong>Key Insights from Council:</strong></p><ul>';
-        decision.key_insights.forEach(insight => {
-            output += `<li>${insight}</li>`;
-        });
-        output += '</ul>';
+    // Method & Model info
+    const providerNames = Object.values(councilData).map(p => p.name).filter(Boolean).join(', ');
+    output += `<div class="decision-method-badge">
+        <span class="method-label">Decided via</span>
+        <span class="method-name">LLM Council</span>
+        <span class="model-name">Chairman: ${chairmanProvider}</span>
+    </div>`;
+
+    // Executive Summary
+    const summary = decision.executive_summary || decision.weighted_reasoning || '';
+    if (summary) {
+        output += `<div class="decision-section">
+            <h4>Executive Summary</h4>
+            <p>${summary}</p>
+        </div>`;
     }
 
-    if (decision.next_steps && decision.next_steps.length > 0) {
-        output += '<p><strong>Recommended Next Steps:</strong></p><ul>';
-        decision.next_steps.forEach(step => {
-            output += `<li>${step}</li>`;
+    // Key findings from each LLM
+    if (Object.keys(councilData).length > 0) {
+        output += `<div class="decision-section">
+            <h4>Key Findings by LLM</h4>
+            <div class="exec-findings-grid">`;
+
+        Object.entries(councilData).forEach(([providerId, data]) => {
+            if (data.parsed) {
+                const llmRec = (data.parsed.recommendation || '').toUpperCase();
+                const confidence = data.parsed.confidence_level || '';
+                const keyInsight = data.parsed.executive_summary || data.parsed.product_analysis || '';
+
+                output += `<div class="exec-finding-card">
+                    <div class="exec-finding-header">
+                        <span class="exec-emoji">🤖</span>
+                        <span class="exec-name">${data.name || providerId}</span>
+                        ${llmRec ? `<span class="exec-rec ${getRecClass(llmRec)}">${llmRec}</span>` : ''}
+                    </div>
+                    <div class="exec-finding-content">
+                        ${confidence ? `<div class="exec-confidence">${confidence}% confident</div>` : ''}
+                        <p class="exec-insight">${keyInsight}</p>
+                    </div>
+                </div>`;
+            }
         });
-        output += '</ul>';
+        output += '</div></div>';
+    }
+
+    // Key insights from council
+    const keyInsights = decision.key_insights || [];
+    if (keyInsights.length > 0) {
+        output += `<div class="decision-section">
+            <h4>Key Insights from Council</h4>
+            <ul class="consensus-list">${keyInsights.map(p => `<li>${formatStepItem(p)}</li>`).join('')}</ul>
+        </div>`;
+    }
+
+    // Consensus points
+    const consensusPoints = decision.consensus_points || [];
+    if (consensusPoints.length > 0) {
+        output += `<div class="decision-section">
+            <h4>Areas of Agreement</h4>
+            <ul class="consensus-list">${consensusPoints.map(p => `<li>${formatStepItem(p)}</li>`).join('')}</ul>
+        </div>`;
+    }
+
+    // Disagreement areas
+    const disagreements = decision.disagreement_areas || [];
+    if (disagreements.length > 0) {
+        output += `<div class="decision-section disagreements">
+            <h4>Areas of Debate</h4>
+            <ul class="disagreement-list">${disagreements.map(d => `<li>${formatStepItem(d)}</li>`).join('')}</ul>
+        </div>`;
+    }
+
+    // Risk factors
+    const risks = decision.risk_factors || [];
+    if (risks.length > 0) {
+        output += `<div class="decision-section disagreements">
+            <h4>Risk Factors</h4>
+            <ul class="disagreement-list">${risks.map(r => `<li>${formatStepItem(r)}</li>`).join('')}</ul>
+        </div>`;
+    }
+
+    // Next steps
+    const nextSteps = decision.next_steps || [];
+    if (nextSteps.length > 0) {
+        output += `<div class="decision-section">
+            <h4>Recommended Next Steps</h4>
+            <ul class="next-steps-list">${nextSteps.map(step => `<li>${formatStepItem(step)}</li>`).join('')}</ul>
+        </div>`;
     }
 
     decisionOutput.innerHTML = output;
@@ -1384,6 +1616,7 @@ function showCouncilDecision(decision, chairmanProvider) {
 function showComparisonResults(consensusResult, councilResult, comparison) {
     debateInProgress = false;
     startButton.disabled = false;
+    stopButton.style.display = 'none';
     showStatus('Both methods complete!', 'success');
 
     // Show comparison summary
@@ -1451,13 +1684,13 @@ function updateMethodUI(method) {
 
     // Update description
     const descriptions = {
-        consensus: '4 AI executives debate from their specialized perspectives',
-        council: 'Multiple LLMs provide answers, then anonymously peer-review each other',
-        both: 'Run both methods in parallel and compare results'
+        consensus: '🤝 4 AI executives (CFO, CPO, CTO, CRO) analyze your decision from their specialized perspectives, then synthesize a unified recommendation',
+        council: '🧠 Multiple LLM providers (GPT-4, Claude, Gemini) independently analyze, anonymously peer-review each other, then the highest-rated becomes chairman. <em style="color: #94a3b8; font-size: 0.9em;">Inspired by <a href="https://github.com/karpathy/llm-council" target="_blank" style="color: #60a5fa;">Andrej Karpathy\'s llm-council</a> concept of overcoming "Model Monoculture Syndrome"</em>',
+        both: '⚖️ Run both methods in parallel and compare their recommendations to see if they agree'
     };
     const descEl = document.getElementById('methodDescription');
     if (descEl) {
-        descEl.textContent = descriptions[method] || '';
+        descEl.innerHTML = descriptions[method] || '';
     }
 
     // Update cost estimate
@@ -1533,9 +1766,36 @@ startButton.addEventListener('click', () => {
     }));
 });
 
+// Stop button click handler
+stopButton.addEventListener('click', () => {
+    if (debateInProgress && ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'cancel_debate' }));
+        showStatus('Cancelling debate...', 'loading');
+    }
+});
+
 function showStatus(message, type) {
     statusMessage.textContent = message;
     statusMessage.className = `status-message ${type}`;
+}
+
+// ============================================================================
+// Guidance Toggle Function
+// ============================================================================
+
+let guidanceExpanded = false;
+
+function toggleGuidance() {
+    guidanceExpanded = !guidanceExpanded;
+    const content = document.getElementById('guidanceContent');
+    const arrow = document.getElementById('guidanceArrow');
+
+    if (content) {
+        content.classList.toggle('expanded', guidanceExpanded);
+    }
+    if (arrow) {
+        arrow.textContent = guidanceExpanded ? '▲' : '▼';
+    }
 }
 
 // ============================================================================
@@ -1599,17 +1859,21 @@ function renderHistoryList(debates) {
         const recClass = rec === 'GO' ? 'go' : rec === 'PIVOT' ? 'pivot' : 'hold';
         const confidence = debate.confidence || 0;
         const consensus = debate.consensus_level ? Math.round(debate.consensus_level * 100) : 0;
+        const method = debate.method || 'consensus';
+        const methodEmoji = method === 'council' ? '🧠' : '🤝';
+        const methodLabel = method === 'council' ? 'Council' : 'Consensus';
 
         html += `
             <div class="history-item" onclick="showHistoryDetail('${debate.id}')">
                 <div class="history-item-header">
                     <span class="history-item-date">${dateStr}</span>
+                    <span class="history-item-method ${method}">${methodEmoji} ${methodLabel}</span>
                     <span class="history-item-rec ${recClass}">${rec}</span>
                 </div>
                 <div class="history-item-question">${escapeHtml(debate.question)}</div>
                 <div class="history-item-meta">
                     <span>🎯 ${confidence}% confidence</span>
-                    <span>🤝 ${consensus}% consensus</span>
+                    ${method === 'consensus' ? `<span>🤝 ${consensus}% alignment</span>` : ''}
                 </div>
             </div>
         `;
@@ -1653,6 +1917,9 @@ function showDetailModal(debate) {
 
     const rec = (debate.recommendation || 'PENDING').toUpperCase();
     const recClass = rec === 'GO' ? 'go' : rec === 'PIVOT' ? 'pivot' : 'hold';
+    const method = debate.method || 'consensus';
+    const methodEmoji = method === 'council' ? '🧠' : '🤝';
+    const methodLabel = method === 'council' ? 'LLM Council' : 'Executive Consensus';
 
     // Build executives section
     let execsHtml = '';
@@ -1699,6 +1966,7 @@ function showDetailModal(debate) {
     modal.innerHTML = `
         <div class="modal-header">
             <h3>${dateStr}</h3>
+            <span class="modal-method-badge ${method}">${methodEmoji} ${methodLabel}</span>
             <button class="close-btn" onclick="closeDetailModal()">×</button>
         </div>
         <div class="modal-body">
@@ -1713,10 +1981,12 @@ function showDetailModal(debate) {
                     <span class="recommendation-badge ${recClass}" style="padding: 12px 20px; font-size: 1.1em;">
                         ${rec}<br><small>${debate.confidence || 0}%</small>
                     </span>
+                    ${method === 'consensus' ? `
                     <div>
-                        <div style="color: #6B7280; font-size: 0.9em;">Consensus Level</div>
+                        <div style="color: #6B7280; font-size: 0.9em;">Alignment Level</div>
                         <div style="font-size: 1.2em; font-weight: 600;">${debate.consensus_level ? Math.round(debate.consensus_level * 100) : 0}%</div>
                     </div>
+                    ` : ''}
                 </div>
                 ${decisionSummary ? `<p>${escapeHtml(decisionSummary)}</p>` : ''}
             </div>
@@ -1732,7 +2002,7 @@ function showDetailModal(debate) {
 
             ${execsHtml ? `
                 <div class="modal-section">
-                    <h4>Executive Perspectives</h4>
+                    <h4>${method === 'council' ? 'LLM Responses' : 'Executive Perspectives'}</h4>
                     <div class="modal-executives-grid">
                         ${execsHtml}
                     </div>
@@ -1844,6 +2114,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Load history count on startup (optional preview)
     loadHistoryPreview();
+
+    // Fetch available providers for model display
+    fetchProviders();
 });
 
 async function loadHistoryPreview() {

@@ -8,6 +8,7 @@ Supports multiple LLM providers for the Council decision method:
 """
 
 import os
+import logging
 from abc import ABC, abstractmethod
 from typing import AsyncIterator, List, Optional, Dict, Any
 from dataclasses import dataclass
@@ -66,17 +67,24 @@ class LLMProvider(ABC):
 
 
 class AzureOpenAIProvider(LLMProvider):
-    """Azure OpenAI GPT-4 provider"""
+    """Azure OpenAI GPT provider"""
 
     def __init__(self):
+        model = os.getenv("AZURE_DEPLOYMENT_GPT4", "gpt-4-turbo")
+        # Extract display name from deployment (e.g., "gpt-5.2-chat" -> "GPT-5.2")
+        display_name = model.replace("-chat", "").replace("gpt-", "GPT-").replace("-", " ")
         super().__init__(
             provider_id="azure",
-            name="Azure OpenAI",
-            model=os.getenv("AZURE_DEPLOYMENT_GPT4", "gpt-4-turbo")
+            name=display_name,
+            model=model
         )
         self.endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
         self.api_key = os.getenv("AZURE_OPENAI_API_KEY")
         self._llm = None
+        if self.is_configured():
+            logging.info(f"[Azure] Configured: endpoint={self.endpoint}, deployment={self.model}")
+        else:
+            logging.warning(f"[Azure] Not configured: missing endpoint or API key")
 
     def is_configured(self) -> bool:
         return bool(self.endpoint and self.api_key)
@@ -92,7 +100,7 @@ class AzureOpenAIProvider(LLMProvider):
                 api_key=self.api_key,
                 deployment_name=self.model,
                 api_version="2024-12-01-preview",
-                temperature=0.7,
+                temperature=1,
                 max_tokens=2500
             )
         return self._llm
@@ -123,11 +131,13 @@ class AnthropicProvider(LLMProvider):
     def __init__(self):
         super().__init__(
             provider_id="anthropic",
-            name="Anthropic Claude",
-            model="claude-3-5-sonnet-20241022"
+            name="Claude Sonnet 4.5",
+            model="claude-sonnet-4-5-20250929"
         )
         self.api_key = os.getenv("ANTHROPIC_API_KEY")
         self._client = None
+        if self.is_configured():
+            logging.info(f"[Anthropic] Configured: model={self.model}")
 
     def is_configured(self) -> bool:
         return bool(self.api_key)
@@ -171,11 +181,13 @@ class GoogleGeminiProvider(LLMProvider):
     def __init__(self):
         super().__init__(
             provider_id="google",
-            name="Google Gemini",
-            model="gemini-1.5-pro"
+            name="Gemini 3 Pro",
+            model="gemini-3-pro-preview"
         )
         self.api_key = os.getenv("GOOGLE_API_KEY")
         self._model = None
+        if self.is_configured():
+            logging.info(f"[Google] Configured: model={self.model}")
 
     def is_configured(self) -> bool:
         return bool(self.api_key)

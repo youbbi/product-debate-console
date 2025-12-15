@@ -31,8 +31,19 @@ def init_db():
                     confidence INTEGER,
                     consensus_level FLOAT,
                     executives JSONB,
-                    final_decision JSONB
+                    final_decision JSONB,
+                    method TEXT DEFAULT 'consensus'
                 )
+            """)
+            # Add method column if it doesn't exist (for existing databases)
+            cur.execute("""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                   WHERE table_name='debates' AND column_name='method') THEN
+                        ALTER TABLE debates ADD COLUMN method TEXT DEFAULT 'consensus';
+                    END IF;
+                END $$;
             """)
             conn.commit()
         print("Database initialized")
@@ -52,8 +63,8 @@ def save_debate(debate_data: dict) -> bool:
     try:
         with conn.cursor() as cur:
             cur.execute("""
-                INSERT INTO debates (id, question, context, recommendation, confidence, consensus_level, executives, final_decision)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO debates (id, question, context, recommendation, confidence, consensus_level, executives, final_decision, method)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (id) DO UPDATE SET
                     question = EXCLUDED.question,
                     context = EXCLUDED.context,
@@ -61,7 +72,8 @@ def save_debate(debate_data: dict) -> bool:
                     confidence = EXCLUDED.confidence,
                     consensus_level = EXCLUDED.consensus_level,
                     executives = EXCLUDED.executives,
-                    final_decision = EXCLUDED.final_decision
+                    final_decision = EXCLUDED.final_decision,
+                    method = EXCLUDED.method
             """, (
                 debate_data.get('id'),
                 debate_data.get('question'),
@@ -70,7 +82,8 @@ def save_debate(debate_data: dict) -> bool:
                 debate_data.get('confidence'),
                 debate_data.get('consensus_level'),
                 json.dumps(debate_data.get('executives', {})),
-                json.dumps(debate_data.get('final_decision', {}))
+                json.dumps(debate_data.get('final_decision', {})),
+                debate_data.get('method', 'consensus')
             ))
             conn.commit()
         return True
@@ -89,7 +102,7 @@ def get_all_debates(limit: int = 50) -> list:
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute("""
-                SELECT id, created_at, question, recommendation, confidence, consensus_level
+                SELECT id, created_at, question, recommendation, confidence, consensus_level, method
                 FROM debates
                 ORDER BY created_at DESC
                 LIMIT %s

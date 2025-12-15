@@ -316,7 +316,8 @@ Output JSON with keys:
                 'confidence': result.get('confidence_level'),
                 'consensus_level': result.get('overall_agreement_level'),
                 'executives': executives_data,
-                'final_decision': result.get('final_decision')
+                'final_decision': result.get('final_decision'),
+                'method': 'consensus'
             })
         except Exception as e:
             print(f"Failed to save debate to history: {e}")
@@ -339,6 +340,43 @@ Output JSON with keys:
         })
 
         result = await self.council_graph.invoke_async(query, context)
+
+        # Save council debate to history
+        try:
+            # Format LLM responses as "executives" for consistent history display
+            llm_data = {}
+            for resp in result.get('llm_responses', []):
+                provider_id = resp.get('provider_id', 'unknown')
+                llm_data[provider_id] = {
+                    'name': resp.get('provider_name', provider_id),
+                    'title': 'LLM Provider',
+                    'emoji': '🤖',
+                    'output': resp.get('response', ''),
+                    'parsed_data': resp.get('parsed_data', {})
+                }
+
+            # Parse final_decision if it's a string
+            final_decision = result.get('final_decision', {})
+            if isinstance(final_decision, str):
+                try:
+                    final_decision = json.loads(final_decision)
+                except:
+                    final_decision = {'raw': final_decision}
+
+            save_debate({
+                'id': session_id,
+                'question': query,
+                'context': context,
+                'recommendation': result.get('recommendation_type'),
+                'confidence': result.get('confidence_level'),
+                'consensus_level': None,  # Council doesn't have consensus level
+                'executives': llm_data,
+                'final_decision': final_decision,
+                'method': 'council'
+            })
+        except Exception as e:
+            print(f"Failed to save council debate to history: {e}")
+
         return result
 
     async def _run_both(

@@ -106,6 +106,7 @@ async def remove_debate(debate_id: str):
 async def websocket_endpoint(websocket: WebSocket):
     """WebSocket for real-time debate streaming"""
     await manager.connect(websocket)
+    active_task = None  # Track the running debate task
 
     try:
         while True:
@@ -127,24 +128,40 @@ async def websocket_endpoint(websocket: WebSocket):
                     })
                     continue
 
-                try:
-                    # Run debate with selected method
-                    result = await debate_graph.invoke_async(query, context, method=method)
+                async def run_debate():
+                    try:
+                        # Run debate with selected method
+                        result = await debate_graph.invoke_async(query, context, method=method)
 
-                    # Broadcast completion
-                    await manager.broadcast({
-                        "type": "debate_complete",
-                        "method": method,
-                        "recommendation": result.get('recommendation_type'),
-                        "confidence": result.get('confidence_level'),
-                        "timestamp": datetime.now().isoformat()
-                    })
-                except Exception as e:
-                    await manager.broadcast({
-                        "type": "error",
-                        "message": str(e),
-                        "timestamp": datetime.now().isoformat()
-                    })
+                        # Broadcast completion
+                        await manager.broadcast({
+                            "type": "debate_complete",
+                            "method": method,
+                            "recommendation": result.get('recommendation_type'),
+                            "confidence": result.get('confidence_level'),
+                            "timestamp": datetime.now().isoformat()
+                        })
+                    except asyncio.CancelledError:
+                        # Task was cancelled - broadcast cancellation
+                        await manager.broadcast({
+                            "type": "debate_cancelled",
+                            "timestamp": datetime.now().isoformat()
+                        })
+                    except Exception as e:
+                        await manager.broadcast({
+                            "type": "error",
+                            "message": str(e),
+                            "timestamp": datetime.now().isoformat()
+                        })
+
+                # Start debate as a task so it can be cancelled
+                active_task = asyncio.create_task(run_debate())
+
+            elif message.get("type") == "cancel_debate":
+                # Cancel the running debate
+                if active_task and not active_task.done():
+                    active_task.cancel()
+                    active_task = None
 
             elif message.get("type") == "ping":
                 # Keep-alive
@@ -154,6 +171,9 @@ async def websocket_endpoint(websocket: WebSocket):
                 })
 
     except WebSocketDisconnect:
+        # Cancel any running task on disconnect
+        if active_task and not active_task.done():
+            active_task.cancel()
         await manager.disconnect(websocket)
 
 # ============================================================================

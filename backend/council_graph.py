@@ -10,6 +10,7 @@ Implements the three-stage LangGraph workflow for the Council decision method:
 from langgraph.graph import StateGraph, START, END
 import asyncio
 import json
+import logging
 from datetime import datetime
 import uuid
 from typing import List
@@ -59,13 +60,15 @@ class LLMCouncilGraph:
         if len(providers) < 2:
             raise ValueError(f"Council requires at least 2 providers, found {len(providers)}")
 
-        # Create anonymous IDs for providers
+        # Create anonymous IDs for providers and map to actual names
         provider_ids = [f"llm_{i+1}" for i in range(len(providers))]
+        provider_names = {f"llm_{i+1}": p.name for i, p in enumerate(providers)}
 
-        # Broadcast divergence start
+        # Broadcast divergence start with provider names
         await manager.broadcast({
             "type": "council_divergence_start",
             "providers": provider_ids,
+            "provider_names": provider_names,
             "total_providers": len(providers),
             "timestamp": datetime.now().isoformat()
         })
@@ -79,14 +82,18 @@ class LLMCouncilGraph:
         # Create tasks for parallel execution
         async def get_llm_response(provider: LLMProvider, provider_id: str) -> LLMResponse:
             """Get response from a single LLM with streaming"""
+            logging.info(f"[Council] Starting provider {provider_id} ({provider.name})")
             try:
                 # Stream response
                 full_response = ""
+                token_count = 0
                 async for token in provider.astream(prompt):
+                    token_count += 1
                     full_response += token
                     await manager.broadcast({
                         "type": "council_response_streaming",
                         "provider_id": provider_id,
+                        "provider_name": provider.name,
                         "token": token,
                         "timestamp": datetime.now().isoformat()
                     })
@@ -112,10 +119,13 @@ class LLMCouncilGraph:
                     streaming_complete=True
                 )
 
+                logging.info(f"[Council] Completed {provider_id} ({provider.name}): {token_count} tokens")
+
                 # Broadcast completion
                 await manager.broadcast({
                     "type": "council_response_complete",
                     "provider_id": provider_id,
+                    "provider_name": provider.name,
                     "response": full_response[:500] + "..." if len(full_response) > 500 else full_response,
                     "parsed_data": parsed,
                     "timestamp": datetime.now().isoformat()
@@ -124,6 +134,17 @@ class LLMCouncilGraph:
                 return response
 
             except Exception as e:
+                logging.error(f"[Council] {provider_id} ({provider.name}) failed: {type(e).__name__}: {str(e)}")
+
+                # Broadcast error event so frontend knows
+                await manager.broadcast({
+                    "type": "council_response_error",
+                    "provider_id": provider_id,
+                    "provider_name": provider.name,
+                    "error": str(e),
+                    "timestamp": datetime.now().isoformat()
+                })
+
                 # Return error response
                 return LLMResponse(
                     provider_id=provider_id,
@@ -141,10 +162,21 @@ class LLMCouncilGraph:
         ]
         responses = await asyncio.gather(*tasks)
 
+        # Analyze divergence between responses
+        divergence_analysis = CouncilEvaluator.analyze_divergence(list(responses))
+
+        # Broadcast divergence analysis for UI highlighting
+        await manager.broadcast({
+            "type": "council_divergence_analysis",
+            "analysis": divergence_analysis,
+            "timestamp": datetime.now().isoformat()
+        })
+
         return {
             "llm_responses": list(responses),
             "divergence_complete": True,
-            "total_providers": len(providers)
+            "total_providers": len(providers),
+            "divergence_analysis": divergence_analysis
         }
 
     async def _parallel_peer_review(self, state: CouncilDecisionState) -> dict:
