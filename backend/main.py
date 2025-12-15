@@ -9,6 +9,8 @@ from config import Config
 from graph import ProductDebateGraph
 from websocket_manager import manager
 from state import create_initial_state
+from llm_providers import get_available_provider_info, calculate_cost_estimate
+from database import get_all_debates, get_debate_by_id, delete_debate
 
 app = FastAPI(title="Product Strategy Debate Console")
 
@@ -30,6 +32,28 @@ async def root():
 async def framework():
     """Serve the decision framework documentation"""
     return FileResponse("frontend/framework.html")
+
+@app.get("/council-framework")
+async def council_framework():
+    """Serve the LLM Council framework documentation"""
+    return FileResponse("frontend/council-framework.html")
+
+@app.get("/api/providers")
+async def get_providers():
+    """Get list of available LLM providers for Council method"""
+    providers = get_available_provider_info()
+    return {
+        "providers": providers,
+        "count": len(providers),
+        "council_available": len(providers) >= 2
+    }
+
+@app.get("/api/cost-estimate/{method}")
+async def get_cost_estimate(method: str):
+    """Get estimated API cost for a decision method"""
+    if method not in ["consensus", "council", "both"]:
+        return {"error": f"Unknown method: {method}"}
+    return calculate_cost_estimate(method)
 
 @app.post("/api/debate")
 async def start_debate(payload: dict):
@@ -54,11 +78,25 @@ async def start_debate(payload: dict):
     except Exception as e:
         return {"error": str(e)}
 
-@app.get("/api/sessions/{session_id}")
-async def get_session(session_id: str):
-    """Retrieve a past debate session"""
-    # This would query your database
-    return {"session_id": session_id, "status": "not_implemented"}
+@app.get("/api/debates")
+async def list_debates():
+    """List all past debates"""
+    debates = get_all_debates(limit=50)
+    return {"debates": debates, "count": len(debates)}
+
+@app.get("/api/debates/{debate_id}")
+async def get_debate(debate_id: str):
+    """Get full details of a specific debate"""
+    debate = get_debate_by_id(debate_id)
+    if not debate:
+        return {"error": "Debate not found"}
+    return debate
+
+@app.delete("/api/debates/{debate_id}")
+async def remove_debate(debate_id: str):
+    """Delete a debate from history"""
+    success = delete_debate(debate_id)
+    return {"success": success}
 
 # ============================================================================
 # WebSocket for Real-Time Streaming
@@ -68,28 +106,35 @@ async def get_session(session_id: str):
 async def websocket_endpoint(websocket: WebSocket):
     """WebSocket for real-time debate streaming"""
     await manager.connect(websocket)
-    
+
     try:
         while True:
             # Receive message from client
             data = await websocket.receive_text()
             message = json.loads(data)
-            
+
             if message.get("type") == "start_debate":
-                # Start new debate
+                # Start new debate with selected method
                 query = message.get("question")
                 context = message.get("context", {})
-                
-                await manager.broadcast({
-                    "type": "debate_started",
-                    "timestamp": datetime.now().isoformat()
-                })
-                
+                method = message.get("method", "consensus")  # Default to consensus
+
+                # Validate method
+                if method not in ["consensus", "council", "both"]:
+                    await manager.broadcast({
+                        "type": "error",
+                        "message": f"Unknown method: {method}"
+                    })
+                    continue
+
                 try:
-                    result = await debate_graph.invoke_async(query, context)
-                    
+                    # Run debate with selected method
+                    result = await debate_graph.invoke_async(query, context, method=method)
+
+                    # Broadcast completion
                     await manager.broadcast({
                         "type": "debate_complete",
+                        "method": method,
                         "recommendation": result.get('recommendation_type'),
                         "confidence": result.get('confidence_level'),
                         "timestamp": datetime.now().isoformat()
@@ -97,16 +142,17 @@ async def websocket_endpoint(websocket: WebSocket):
                 except Exception as e:
                     await manager.broadcast({
                         "type": "error",
-                        "message": str(e)
+                        "message": str(e),
+                        "timestamp": datetime.now().isoformat()
                     })
-            
+
             elif message.get("type") == "ping":
                 # Keep-alive
                 await manager.broadcast({
                     "type": "pong",
                     "timestamp": datetime.now().isoformat()
                 })
-    
+
     except WebSocketDisconnect:
         await manager.disconnect(websocket)
 
@@ -117,10 +163,13 @@ async def websocket_endpoint(websocket: WebSocket):
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
+    providers = Config.get_enabled_providers()
     return {
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
-        "azure_configured": bool(Config.AZURE_ENDPOINT)
+        "azure_configured": bool(Config.AZURE_ENDPOINT),
+        "enabled_providers": providers,
+        "council_available": len(providers) >= 2
     }
 
 # ============================================================================

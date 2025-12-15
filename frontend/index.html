@@ -16,8 +16,24 @@
         <header class="header">
             <h1>🚀 Executive Strategy Debate Console</h1>
             <p class="subtitle">Real-time multi-perspective product decision-making</p>
-            <a href="/framework" class="how-it-works-link">How it works →</a>
+            <div class="header-links">
+                <a href="/framework" class="how-it-works-link">Consensus Framework →</a>
+                <a href="/council-framework" class="how-it-works-link">LLM Council Framework →</a>
+                <button class="history-btn" onclick="toggleHistoryPanel()">📜 History</button>
+            </div>
         </header>
+
+        <!-- History Panel (Slide-out) -->
+        <div id="historyPanel" class="history-panel">
+            <div class="history-header">
+                <h3>📜 Debate History</h3>
+                <button class="close-btn" onclick="toggleHistoryPanel()">×</button>
+            </div>
+            <div id="historyList" class="history-list">
+                <p class="history-empty">Loading...</p>
+            </div>
+        </div>
+        <div id="historyOverlay" class="history-overlay" onclick="toggleHistoryPanel()"></div>
 
         <!-- Main Content -->
         <div class="main-content">
@@ -62,6 +78,29 @@
                     </div>
                 </div>
 
+                <!-- Method Selector -->
+                <div class="method-selector">
+                    <label>Decision Method</label>
+                    <div class="method-toggle">
+                        <button class="method-btn active" data-method="consensus">
+                            Executive Consensus
+                        </button>
+                        <button class="method-btn" data-method="council">
+                            LLM Council
+                        </button>
+                        <button class="method-btn" data-method="both">
+                            Both (Compare)
+                        </button>
+                    </div>
+                    <p class="method-description" id="methodDescription">
+                        4 AI executives debate from their specialized perspectives
+                    </p>
+                    <div class="cost-estimate" id="costEstimate">
+                        <span class="cost-label">Estimated cost:</span>
+                        <span class="cost-value" id="costValue">~$0.10</span>
+                    </div>
+                </div>
+
                 <button id="startButton" class="btn btn-primary">
                     🎬 Start Debate
                 </button>
@@ -70,50 +109,152 @@
             </section>
 
             <!-- Execution Panel (Right) -->
-            <section class="execution-panel">
-                <!-- Consensus Meter -->
-                <div class="consensus-container">
-                    <h3>Executive Alignment</h3>
-                    <div class="consensus-meter">
-                        <div class="meter-bar">
-                            <div id="consensusBar" class="consensus-level" style="width: 0%"></div>
+            <section class="execution-panel" id="executionPanel">
+                <!-- Single Method View (Consensus or Council) -->
+                <div id="singleView">
+                    <!-- Consensus View -->
+                    <div id="consensusView">
+                        <!-- Consensus Meter -->
+                        <div class="consensus-container">
+                            <h3>Executive Alignment</h3>
+                            <div class="consensus-meter">
+                                <div class="meter-bar">
+                                    <div id="consensusBar" class="consensus-level" style="width: 0%"></div>
+                                </div>
+                                <div class="meter-label">
+                                    <span id="consensusText">Waiting...</span>
+                                </div>
+                            </div>
                         </div>
-                        <div class="meter-label">
-                            <span id="consensusText">Waiting...</span>
+
+                        <!-- Executive Outputs (Real-time) -->
+                        <div class="executives-container">
+                            <div class="view-toggle">
+                                <h3>Executive Perspectives</h3>
+                                <button id="viewToggle" class="btn-toggle" onclick="toggleComparisonView()">
+                                    Show Comparison
+                                </button>
+                            </div>
+
+                            <!-- Grid View (Default) -->
+                            <div id="executivesGrid" class="executives-grid">
+                                <!-- Dynamically populated -->
+                            </div>
+
+                            <!-- Comparison View (Hidden by default) -->
+                            <div id="comparisonView" class="comparison-view" style="display: none;">
+                                <table class="comparison-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Category</th>
+                                            <th>CFO</th>
+                                            <th>CPO</th>
+                                            <th>CTO</th>
+                                            <th>CRO</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="comparisonBody">
+                                        <!-- Dynamically populated -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Council View (Hidden by default) -->
+                    <div id="councilView" style="display: none;">
+                        <!-- Council Stage Indicator -->
+                        <div class="council-container">
+                            <h3>LLM Council Process</h3>
+                            <div class="council-stage-indicator">
+                                <div class="stage" id="stageDivergence">
+                                    <span class="stage-number">1</span>
+                                    <span class="stage-name">Divergence</span>
+                                </div>
+                                <div class="stage-connector"></div>
+                                <div class="stage" id="stageConvergence">
+                                    <span class="stage-number">2</span>
+                                    <span class="stage-name">Peer Review</span>
+                                </div>
+                                <div class="stage-connector"></div>
+                                <div class="stage" id="stageSynthesis">
+                                    <span class="stage-number">3</span>
+                                    <span class="stage-name">Synthesis</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Council LLM Responses -->
+                        <div class="council-responses-container">
+                            <h3>LLM Responses</h3>
+                            <div id="councilResponses" class="council-responses-grid">
+                                <!-- Dynamically populated -->
+                            </div>
+                        </div>
+
+                        <!-- Rating Matrix -->
+                        <div class="rating-matrix-container" id="ratingMatrixContainer" style="display: none;">
+                            <h3>Peer Review Matrix</h3>
+                            <div id="ratingMatrix" class="rating-matrix">
+                                <!-- Dynamically populated -->
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Executive Outputs (Real-time) -->
-                <div class="executives-container">
-                    <div class="view-toggle">
-                        <h3>Executive Perspectives</h3>
-                        <button id="viewToggle" class="btn-toggle" onclick="toggleComparisonView()">
-                            Show Comparison
-                        </button>
+                <!-- Side-by-Side Comparison View (for "Both" method) -->
+                <div id="sideBySideView" style="display: none;">
+                    <div class="comparison-panels">
+                        <div class="panel-left">
+                            <h3>Executive Consensus</h3>
+                            <div id="consensusSide">
+                                <div class="consensus-meter">
+                                    <div class="meter-bar">
+                                        <div id="consensusBarLeft" class="consensus-level" style="width: 0%"></div>
+                                    </div>
+                                    <div class="meter-label">
+                                        <span id="consensusTextLeft">Waiting...</span>
+                                    </div>
+                                </div>
+                                <div id="executivesGridLeft" class="executives-grid mini">
+                                    <!-- Dynamically populated -->
+                                </div>
+                            </div>
+                        </div>
+                        <div class="panel-right">
+                            <h3>LLM Council</h3>
+                            <div id="councilSide">
+                                <div class="council-stage-indicator mini">
+                                    <div class="stage" id="stageDivergenceRight">1</div>
+                                    <div class="stage" id="stageConvergenceRight">2</div>
+                                    <div class="stage" id="stageSynthesisRight">3</div>
+                                </div>
+                                <div id="councilResponsesRight" class="council-responses-grid mini">
+                                    <!-- Dynamically populated -->
+                                </div>
+                            </div>
+                        </div>
                     </div>
-
-                    <!-- Grid View (Default) -->
-                    <div id="executivesGrid" class="executives-grid">
-                        <!-- Dynamically populated -->
-                    </div>
-
-                    <!-- Comparison View (Hidden by default) -->
-                    <div id="comparisonView" class="comparison-view" style="display: none;">
-                        <table class="comparison-table">
-                            <thead>
-                                <tr>
-                                    <th>Category</th>
-                                    <th>CFO</th>
-                                    <th>CPO</th>
-                                    <th>CTO</th>
-                                    <th>CRO</th>
-                                </tr>
-                            </thead>
-                            <tbody id="comparisonBody">
-                                <!-- Dynamically populated -->
-                            </tbody>
-                        </table>
+                    <!-- Comparison Summary -->
+                    <div class="comparison-summary" id="comparisonSummary" style="display: none;">
+                        <h3>Method Comparison</h3>
+                        <div class="comparison-metrics">
+                            <div class="comparison-metric">
+                                <span class="label">Recommendations Match</span>
+                                <span class="value" id="matchValue">-</span>
+                            </div>
+                            <div class="comparison-metric">
+                                <span class="label">Consensus Confidence</span>
+                                <span class="value" id="consensusConfValue">-</span>
+                            </div>
+                            <div class="comparison-metric">
+                                <span class="label">Council Confidence</span>
+                                <span class="value" id="councilConfValue">-</span>
+                            </div>
+                        </div>
+                        <div class="comparison-insight" id="comparisonInsight">
+                            <!-- Dynamically populated -->
+                        </div>
                     </div>
                 </div>
             </section>

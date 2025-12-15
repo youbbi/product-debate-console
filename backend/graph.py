@@ -3,18 +3,31 @@ import asyncio
 import json
 from datetime import datetime
 import uuid
+from typing import Optional
 
 from config import Config
 from state import ProductDecisionState, create_initial_state, ExecutiveOutput, DebateRound
 from agents import get_all_executives
 from evaluators import ConsensusEvaluator
 from websocket_manager import manager
+from council_graph import LLMCouncilGraph
+from council_state import DualDecisionState, create_dual_state
+from council_evaluators import CouncilEvaluator
+from database import save_debate
 
 class ProductDebateGraph:
     def __init__(self):
         self.llm = Config.get_llm(temperature=0.7)
         self.graph = self._build_graph()
         self.compiled = self.graph.compile()
+        self._council_graph: Optional[LLMCouncilGraph] = None
+
+    @property
+    def council_graph(self) -> LLMCouncilGraph:
+        """Lazy-load council graph only when needed"""
+        if self._council_graph is None:
+            self._council_graph = LLMCouncilGraph()
+        return self._council_graph
     
     def _build_graph(self) -> StateGraph:
         """Build LangGraph with parallel execution"""
@@ -225,12 +238,138 @@ Output JSON with keys:
             "end_time": datetime.now().isoformat()
         }
     
-    async def invoke_async(self, query: str, context: dict = None) -> ProductDecisionState:
-        """Run the debate"""
+    async def invoke_async(
+        self,
+        query: str,
+        context: dict = None,
+        method: str = "consensus"
+    ) -> dict:
+        """Run the debate with selected method
+
+        Args:
+            query: The decision question
+            context: Company context
+            method: "consensus", "council", or "both"
+
+        Returns:
+            Result dict with method-specific structure
+        """
         session_id = str(uuid.uuid4())[:8]
+
+        if method == "consensus":
+            return await self._run_consensus(query, context, session_id)
+        elif method == "council":
+            return await self._run_council(query, context, session_id)
+        elif method == "both":
+            return await self._run_both(query, context, session_id)
+        else:
+            raise ValueError(f"Unknown method: {method}")
+
+    async def _run_consensus(
+        self,
+        query: str,
+        context: dict,
+        session_id: str
+    ) -> ProductDecisionState:
+        """Run the executive consensus debate"""
         state = create_initial_state(query, session_id, context)
-        
+
+        # Broadcast that we're using consensus method
+        await manager.broadcast({
+            "type": "debate_started",
+            "method": "consensus",
+            "session_id": session_id,
+            "timestamp": datetime.now().isoformat()
+        })
+
         # Use async invocation since all nodes are async
         result = await self.compiled.ainvoke(state)
-        
+
+        # Save debate to history
+        try:
+            executives_data = {}
+            for output in result.get('executive_outputs', []):
+                executives_data[output.role] = {
+                    'name': output.name,
+                    'title': output.title,
+                    'emoji': output.emoji,
+                    'output': output.output,
+                    'parsed_data': output.parsed_data
+                }
+
+            save_debate({
+                'id': session_id,
+                'question': query,
+                'context': context,
+                'recommendation': result.get('recommendation_type'),
+                'confidence': result.get('confidence_level'),
+                'consensus_level': result.get('overall_agreement_level'),
+                'executives': executives_data,
+                'final_decision': result.get('final_decision')
+            })
+        except Exception as e:
+            print(f"Failed to save debate to history: {e}")
+
         return result
+
+    async def _run_council(
+        self,
+        query: str,
+        context: dict,
+        session_id: str
+    ) -> dict:
+        """Run the LLM Council workflow"""
+        # Broadcast that we're using council method
+        await manager.broadcast({
+            "type": "debate_started",
+            "method": "council",
+            "session_id": session_id,
+            "timestamp": datetime.now().isoformat()
+        })
+
+        result = await self.council_graph.invoke_async(query, context)
+        return result
+
+    async def _run_both(
+        self,
+        query: str,
+        context: dict,
+        session_id: str
+    ) -> DualDecisionState:
+        """Run both methods in parallel and compare results"""
+        # Broadcast comparison started
+        await manager.broadcast_comparison_started()
+
+        # Run both in parallel
+        consensus_task = asyncio.create_task(
+            self._run_consensus(query, context, session_id + "_cons")
+        )
+        council_task = asyncio.create_task(
+            self._run_council(query, context, session_id + "_cncl")
+        )
+
+        consensus_result, council_result = await asyncio.gather(
+            consensus_task, council_task
+        )
+
+        # Compare results
+        comparison = CouncilEvaluator.compare_decisions(
+            dict(consensus_result),
+            dict(council_result)
+        )
+
+        # Create dual state
+        dual_state = create_dual_state(query, session_id, context, "both")
+        dual_state['consensus_result'] = dict(consensus_result)
+        dual_state['council_result'] = dict(council_result)
+        dual_state['comparison'] = comparison
+        dual_state['end_time'] = datetime.now().isoformat()
+
+        # Broadcast comparison complete
+        await manager.broadcast_comparison_complete(
+            dict(consensus_result),
+            dict(council_result),
+            comparison
+        )
+
+        return dual_state

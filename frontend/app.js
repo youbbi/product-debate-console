@@ -4,6 +4,9 @@ let debateInProgress = false;
 let executiveData = {};  // Store parsed data for comparison view
 let executivePhases = {};  // Track phase state per exec: { cfo: { phase, timeline: [], inputSummary } }
 let isComparisonView = false;
+let selectedMethod = 'consensus';  // 'consensus', 'council', or 'both'
+let councilData = {};  // Store council LLM responses for visualization
+let councilStage = null;  // Current stage: 'divergence', 'convergence', 'synthesis'
 
 // Default question from Debate questions.txt
 const DEFAULT_QUESTION = `Should I pursue building my own application, which is a meal planning it's aimed for B2C. I think the unique advantage is how it's personalising the meal suggestions based on your preferences. It's smart, it always kind of anticipates your needs, it can parse any type of recipes and generates automatically your weekly meal plan based on all your most preferred recipes.
@@ -64,8 +67,10 @@ function connectWebSocket() {
 function handleMessage(message) {
     switch (message.type) {
         case 'debate_started':
-            initializeDebateUI();
-            showStatus('Debate starting... Execs are thinking...', 'loading');
+            initializeDebateUI(message.method || selectedMethod);
+            const methodLabel = message.method === 'council' ? 'LLM Council' :
+                               message.method === 'both' ? 'Both methods' : 'Executive Consensus';
+            showStatus(`${methodLabel} starting...`, 'loading');
             break;
 
         case 'exec_started':
@@ -104,6 +109,62 @@ function handleMessage(message) {
             debateInProgress = false;
             startButton.disabled = false;
             break;
+
+        // ============================================================================
+        // Council Events
+        // ============================================================================
+
+        case 'council_divergence_start':
+            initializeCouncilUI(message.providers);
+            updateCouncilStage('divergence');
+            showStatus('Council divergence: LLMs analyzing...', 'loading');
+            break;
+
+        case 'council_response_streaming':
+            updateCouncilResponse(message.provider_id, message.token, true);
+            break;
+
+        case 'council_response_complete':
+            completeCouncilResponse(message.provider_id, message.response, message.parsed_data);
+            break;
+
+        case 'council_peer_review_start':
+            updateCouncilStage('convergence');
+            showStatus('Peer review: LLMs evaluating each other...', 'loading');
+            break;
+
+        case 'council_peer_review':
+            updatePeerReview(message.reviewer_id, message.target_id, message.score);
+            break;
+
+        case 'council_rating_matrix':
+            renderRatingMatrix(message.matrix);
+            break;
+
+        case 'council_synthesis_start':
+            updateCouncilStage('synthesis');
+            showStatus('Chairman synthesizing final decision...', 'loading');
+            break;
+
+        case 'council_synthesis_streaming':
+            // Could stream chairman's synthesis if needed
+            break;
+
+        case 'council_final_decision':
+            showCouncilDecision(message.decision, message.chairman_provider);
+            break;
+
+        // ============================================================================
+        // Comparison Events (Both method)
+        // ============================================================================
+
+        case 'comparison_started':
+            showStatus('Running both methods in parallel...', 'loading');
+            break;
+
+        case 'comparison_complete':
+            showComparisonResults(message.consensus, message.council, message.comparison);
+            break;
     }
 }
 
@@ -111,46 +172,104 @@ function handleMessage(message) {
 // UI Updates
 // ============================================================================
 
-function initializeDebateUI() {
+function initializeDebateUI(method = 'consensus') {
     debateInProgress = true;
     startButton.disabled = true;
-    executivesGrid.innerHTML = '';
     decisionPanel.style.display = 'none';
     executiveData = {};  // Reset stored data
     executivePhases = {};  // Reset phase tracking
+    councilData = {};  // Reset council data
+    councilStage = null;
+
+    // Show appropriate view based on method
+    const singleView = document.getElementById('singleView');
+    const sideBySideView = document.getElementById('sideBySideView');
+    const consensusView = document.getElementById('consensusView');
+    const councilView = document.getElementById('councilView');
+
+    if (method === 'both') {
+        singleView.style.display = 'none';
+        sideBySideView.style.display = 'block';
+        // Initialize both sides
+        initializeConsensusSide();
+        initializeCouncilSide();
+    } else {
+        singleView.style.display = 'block';
+        sideBySideView.style.display = 'none';
+
+        if (method === 'council') {
+            consensusView.style.display = 'none';
+            councilView.style.display = 'block';
+        } else {
+            consensusView.style.display = 'block';
+            councilView.style.display = 'none';
+            // Initialize consensus view
+            executivesGrid.innerHTML = '';
+            EXECUTIVES.forEach(exec => {
+                const card = createExecutiveCard(exec);
+                executivesGrid.appendChild(card);
+            });
+        }
+    }
 
     // Reset comparison view
     const comparisonBody = document.getElementById('comparisonBody');
     if (comparisonBody) {
         comparisonBody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#64748b;">Waiting for executive analysis...</td></tr>';
     }
+}
 
-    // Create executive cards
+function initializeConsensusSide() {
+    const grid = document.getElementById('executivesGridLeft');
+    if (!grid) return;
+    grid.innerHTML = '';
     EXECUTIVES.forEach(exec => {
-        const card = createExecutiveCard(exec);
-        executivesGrid.appendChild(card);
+        const card = createExecutiveCard(exec, true);  // true = mini version
+        grid.appendChild(card);
     });
 }
 
-function createExecutiveCard(exec) {
+function initializeCouncilSide() {
+    const grid = document.getElementById('councilResponsesRight');
+    if (!grid) return;
+    grid.innerHTML = '<div class="waiting-message">Waiting for council to start...</div>';
+}
+
+function createExecutiveCard(exec, mini = false) {
     const card = document.createElement('div');
-    card.className = 'executive-card';
-    card.id = `exec-${exec.role}`;
-    card.innerHTML = `
-        <div class="executive-header">
-            <div class="executive-emoji">${exec.emoji}</div>
-            <div class="executive-info">
-                <h4>${exec.name}</h4>
-                <p>${exec.title}</p>
+    card.className = `executive-card${mini ? ' mini' : ''}`;
+    card.id = `exec-${exec.role}${mini ? '-mini' : ''}`;
+
+    if (mini) {
+        card.innerHTML = `
+            <div class="executive-header">
+                <div class="executive-emoji">${exec.emoji}</div>
+                <div class="executive-info">
+                    <h4>${exec.name}</h4>
+                </div>
+                <div class="phase-indicator">Waiting...</div>
             </div>
-            <div class="phase-indicator">Waiting...</div>
-        </div>
-        <div class="input-summary"></div>
-        <div class="exec-timeline"></div>
-        <div class="executive-output" id="output-${exec.role}">
-            <span style="color: #64748b; font-style: italic;">Waiting for analysis...</span>
-        </div>
-    `;
+            <div class="executive-output" id="output-${exec.role}-mini">
+                <span style="color: #64748b; font-style: italic;">Waiting...</span>
+            </div>
+        `;
+    } else {
+        card.innerHTML = `
+            <div class="executive-header">
+                <div class="executive-emoji">${exec.emoji}</div>
+                <div class="executive-info">
+                    <h4>${exec.name}</h4>
+                    <p>${exec.title}</p>
+                </div>
+                <div class="phase-indicator">Waiting...</div>
+            </div>
+            <div class="input-summary"></div>
+            <div class="exec-timeline"></div>
+            <div class="executive-output" id="output-${exec.role}">
+                <span style="color: #64748b; font-style: italic;">Waiting for analysis...</span>
+            </div>
+        `;
+    }
     return card;
 }
 
@@ -797,8 +916,306 @@ function showFinalDecision(decision) {
 }
 
 // ============================================================================
+// Council UI Functions
+// ============================================================================
+
+function initializeCouncilUI(providers) {
+    const grid = document.getElementById('councilResponses');
+    if (!grid) return;
+
+    grid.innerHTML = '';
+    councilData = {};
+
+    providers.forEach((providerId, index) => {
+        councilData[providerId] = { response: '', complete: false, scores: {} };
+        const card = createCouncilCard(providerId, `LLM ${index + 1}`);
+        grid.appendChild(card);
+    });
+}
+
+function createCouncilCard(providerId, label) {
+    const card = document.createElement('div');
+    card.className = 'council-card';
+    card.id = `council-${providerId}`;
+    card.innerHTML = `
+        <div class="council-header">
+            <span class="council-label">${label}</span>
+            <span class="council-status">Thinking...</span>
+        </div>
+        <div class="council-output" id="council-output-${providerId}">
+            <span class="waiting">Generating response...</span>
+        </div>
+        <div class="peer-scores" id="scores-${providerId}"></div>
+    `;
+    return card;
+}
+
+function updateCouncilResponse(providerId, token, streaming) {
+    const outputElement = document.getElementById(`council-output-${providerId}`);
+    if (!outputElement) return;
+
+    // Clear waiting message on first token
+    if (outputElement.textContent.includes('Generating response...')) {
+        outputElement.innerHTML = '';
+    }
+
+    // Append token
+    outputElement.textContent += token;
+    outputElement.scrollTop = outputElement.scrollHeight;
+}
+
+function completeCouncilResponse(providerId, response, parsedData) {
+    const card = document.getElementById(`council-${providerId}`);
+    const statusEl = card?.querySelector('.council-status');
+
+    if (statusEl) {
+        statusEl.textContent = 'Complete';
+        statusEl.classList.add('complete');
+    }
+
+    if (councilData[providerId]) {
+        councilData[providerId].response = response;
+        councilData[providerId].complete = true;
+        councilData[providerId].parsed = parsedData;
+    }
+}
+
+function updateCouncilStage(stage) {
+    councilStage = stage;
+
+    // Update stage indicators
+    const stages = ['divergence', 'convergence', 'synthesis'];
+    const stageIds = ['stageDivergence', 'stageConvergence', 'stageSynthesis'];
+
+    const currentIndex = stages.indexOf(stage);
+
+    stageIds.forEach((id, i) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+
+        el.classList.remove('active', 'complete');
+        if (i < currentIndex) {
+            el.classList.add('complete');
+        } else if (i === currentIndex) {
+            el.classList.add('active');
+        }
+    });
+}
+
+function updatePeerReview(reviewerId, targetId, score) {
+    const scoresEl = document.getElementById(`scores-${targetId}`);
+    if (!scoresEl) return;
+
+    // Add or update score display
+    let scoreItem = scoresEl.querySelector(`[data-reviewer="${reviewerId}"]`);
+    if (!scoreItem) {
+        scoreItem = document.createElement('div');
+        scoreItem.className = 'peer-score-item';
+        scoreItem.dataset.reviewer = reviewerId;
+        scoresEl.appendChild(scoreItem);
+    }
+
+    const scoreClass = score >= 7 ? 'high' : score >= 4 ? 'medium' : 'low';
+    scoreItem.innerHTML = `<span class="reviewer">${reviewerId}:</span> <span class="score ${scoreClass}">${score}/10</span>`;
+
+    // Store in councilData
+    if (councilData[targetId]) {
+        councilData[targetId].scores[reviewerId] = score;
+    }
+}
+
+function renderRatingMatrix(matrix) {
+    const container = document.getElementById('ratingMatrixContainer');
+    const matrixEl = document.getElementById('ratingMatrix');
+    if (!container || !matrixEl) return;
+
+    container.style.display = 'block';
+
+    const providers = Object.keys(matrix.aggregated_scores);
+
+    let html = '<table class="matrix-table"><thead><tr><th>LLM</th><th>Avg Score</th><th>Rank</th></tr></thead><tbody>';
+
+    // Sort by score
+    const sorted = providers
+        .map(p => ({ id: p, score: matrix.aggregated_scores[p] }))
+        .sort((a, b) => b.score - a.score);
+
+    sorted.forEach((item, i) => {
+        const isHighest = item.id === matrix.highest_rated;
+        const isLowest = item.id === matrix.lowest_rated;
+        const rowClass = isHighest ? 'highest' : isLowest ? 'lowest' : '';
+        html += `<tr class="${rowClass}">
+            <td>${item.id}</td>
+            <td><span class="score-badge">${item.score.toFixed(1)}</span></td>
+            <td>#${i + 1}${isHighest ? ' (Chairman)' : ''}</td>
+        </tr>`;
+    });
+
+    html += '</tbody></table>';
+    matrixEl.innerHTML = html;
+}
+
+function showCouncilDecision(decision, chairmanProvider) {
+    debateInProgress = false;
+    startButton.disabled = false;
+    showStatus('Council decision complete!', 'success');
+
+    decisionPanel.style.display = 'block';
+
+    // Update recommendation badge
+    const recType = (decision.recommendation || 'HOLD').toUpperCase();
+    recommendationBadge.className = `recommendation-badge ${recType.toLowerCase()}`;
+    recommendationBadge.textContent = `${recType}\n${decision.confidence_level || 0}%`;
+
+    // Update decision output
+    let output = `<p><strong>Chairman:</strong> ${chairmanProvider}</p>`;
+    output += `<p><strong>Executive Summary:</strong></p><p>${decision.executive_summary || decision.weighted_reasoning || ''}</p>`;
+
+    if (decision.key_insights && decision.key_insights.length > 0) {
+        output += '<p><strong>Key Insights from Council:</strong></p><ul>';
+        decision.key_insights.forEach(insight => {
+            output += `<li>${insight}</li>`;
+        });
+        output += '</ul>';
+    }
+
+    if (decision.next_steps && decision.next_steps.length > 0) {
+        output += '<p><strong>Recommended Next Steps:</strong></p><ul>';
+        decision.next_steps.forEach(step => {
+            output += `<li>${step}</li>`;
+        });
+        output += '</ul>';
+    }
+
+    decisionOutput.innerHTML = output;
+    decisionPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function showComparisonResults(consensusResult, councilResult, comparison) {
+    debateInProgress = false;
+    startButton.disabled = false;
+    showStatus('Both methods complete!', 'success');
+
+    // Show comparison summary
+    const summaryEl = document.getElementById('comparisonSummary');
+    if (summaryEl) {
+        summaryEl.style.display = 'block';
+
+        // Update metrics
+        document.getElementById('matchValue').textContent =
+            comparison.recommendations_match ? 'Yes' : 'No';
+        document.getElementById('matchValue').className =
+            `value ${comparison.recommendations_match ? 'agree' : 'disagree'}`;
+
+        document.getElementById('consensusConfValue').textContent =
+            `${comparison.consensus_confidence}%`;
+        document.getElementById('councilConfValue').textContent =
+            `${comparison.council_confidence}%`;
+
+        // Update insight
+        const insightEl = document.getElementById('comparisonInsight');
+        if (insightEl) {
+            insightEl.innerHTML = `<p>${comparison.combined_insight}</p>`;
+            if (comparison.key_differences && comparison.key_differences.length > 0) {
+                insightEl.innerHTML += '<p><strong>Key Differences:</strong></p><ul>' +
+                    comparison.key_differences.map(d => `<li>${d}</li>`).join('') + '</ul>';
+            }
+        }
+    }
+
+    // Show decision panel with combined result
+    decisionPanel.style.display = 'block';
+
+    const consensusRec = comparison.consensus_recommendation;
+    const councilRec = comparison.council_recommendation;
+
+    if (comparison.recommendations_match) {
+        recommendationBadge.className = `recommendation-badge ${consensusRec.toLowerCase()}`;
+        recommendationBadge.textContent = `${consensusRec}\nBoth Agree`;
+    } else {
+        recommendationBadge.className = 'recommendation-badge mixed';
+        recommendationBadge.textContent = `MIXED\n${consensusRec} vs ${councilRec}`;
+    }
+
+    decisionOutput.innerHTML = `
+        <p><strong>Consensus Method:</strong> ${consensusRec} (${comparison.consensus_confidence}%)</p>
+        <p><strong>Council Method:</strong> ${councilRec} (${comparison.council_confidence}%)</p>
+        <hr>
+        <p>${comparison.combined_insight}</p>
+    `;
+
+    decisionPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ============================================================================
+// Method Selection
+// ============================================================================
+
+function updateMethodUI(method) {
+    selectedMethod = method;
+
+    // Update button states
+    document.querySelectorAll('.method-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.method === method);
+    });
+
+    // Update description
+    const descriptions = {
+        consensus: '4 AI executives debate from their specialized perspectives',
+        council: 'Multiple LLMs provide answers, then anonymously peer-review each other',
+        both: 'Run both methods in parallel and compare results'
+    };
+    const descEl = document.getElementById('methodDescription');
+    if (descEl) {
+        descEl.textContent = descriptions[method] || '';
+    }
+
+    // Update cost estimate
+    fetchCostEstimate(method);
+
+    // Update view visibility (for when not in debate)
+    if (!debateInProgress) {
+        const singleView = document.getElementById('singleView');
+        const sideBySideView = document.getElementById('sideBySideView');
+        const consensusView = document.getElementById('consensusView');
+        const councilView = document.getElementById('councilView');
+
+        if (method === 'both') {
+            singleView.style.display = 'none';
+            sideBySideView.style.display = 'block';
+        } else {
+            singleView.style.display = 'block';
+            sideBySideView.style.display = 'none';
+            consensusView.style.display = method === 'consensus' ? 'block' : 'none';
+            councilView.style.display = method === 'council' ? 'block' : 'none';
+        }
+    }
+}
+
+async function fetchCostEstimate(method) {
+    try {
+        const response = await fetch(`/api/cost-estimate/${method}`);
+        const data = await response.json();
+
+        const costEl = document.getElementById('costValue');
+        if (costEl && data.estimated_cost !== undefined) {
+            costEl.textContent = `~$${data.estimated_cost.toFixed(2)}`;
+        }
+    } catch (error) {
+        console.error('Failed to fetch cost estimate:', error);
+    }
+}
+
+// ============================================================================
 // Event Handlers
 // ============================================================================
+
+// Method button click handlers
+document.querySelectorAll('.method-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        updateMethodUI(e.target.dataset.method);
+    });
+});
 
 startButton.addEventListener('click', () => {
     const question = questionInput.value.trim();
@@ -817,17 +1234,265 @@ startButton.addEventListener('click', () => {
         timeline: document.getElementById('timeline').value.trim()
     };
 
-    // Start debate via WebSocket
+    // Start debate via WebSocket with selected method
     ws.send(JSON.stringify({
         type: 'start_debate',
         question: question,
-        context: context
+        context: context,
+        method: selectedMethod
     }));
 });
 
 function showStatus(message, type) {
     statusMessage.textContent = message;
     statusMessage.className = `status-message ${type}`;
+}
+
+// ============================================================================
+// History Panel Functions
+// ============================================================================
+
+let historyPanelOpen = false;
+let historyData = [];
+
+function toggleHistoryPanel() {
+    const panel = document.getElementById('historyPanel');
+    const overlay = document.getElementById('historyOverlay');
+
+    historyPanelOpen = !historyPanelOpen;
+
+    if (historyPanelOpen) {
+        panel.classList.add('active');
+        overlay.classList.add('active');
+        loadHistory();
+    } else {
+        panel.classList.remove('active');
+        overlay.classList.remove('active');
+    }
+}
+
+async function loadHistory() {
+    const listEl = document.getElementById('historyList');
+    listEl.innerHTML = '<p class="history-empty">Loading...</p>';
+
+    try {
+        const response = await fetch('/api/debates');
+        const data = await response.json();
+
+        if (data.debates && data.debates.length > 0) {
+            historyData = data.debates;
+            renderHistoryList(data.debates);
+        } else {
+            listEl.innerHTML = '<p class="history-empty">No debates yet. Run your first debate to see it here.</p>';
+        }
+    } catch (error) {
+        console.error('Failed to load history:', error);
+        listEl.innerHTML = '<p class="history-empty">Failed to load history. Database may not be configured.</p>';
+    }
+}
+
+function renderHistoryList(debates) {
+    const listEl = document.getElementById('historyList');
+
+    let html = '';
+    debates.forEach(debate => {
+        const date = new Date(debate.created_at);
+        const dateStr = date.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+
+        const rec = (debate.recommendation || 'PENDING').toUpperCase();
+        const recClass = rec === 'GO' ? 'go' : rec === 'PIVOT' ? 'pivot' : 'hold';
+        const confidence = debate.confidence || 0;
+        const consensus = debate.consensus_level ? Math.round(debate.consensus_level * 100) : 0;
+
+        html += `
+            <div class="history-item" onclick="showHistoryDetail('${debate.id}')">
+                <div class="history-item-header">
+                    <span class="history-item-date">${dateStr}</span>
+                    <span class="history-item-rec ${recClass}">${rec}</span>
+                </div>
+                <div class="history-item-question">${escapeHtml(debate.question)}</div>
+                <div class="history-item-meta">
+                    <span>🎯 ${confidence}% confidence</span>
+                    <span>🤝 ${consensus}% consensus</span>
+                </div>
+            </div>
+        `;
+    });
+
+    listEl.innerHTML = html;
+}
+
+async function showHistoryDetail(debateId) {
+    try {
+        const response = await fetch(`/api/debates/${debateId}`);
+        const debate = await response.json();
+
+        if (debate.error) {
+            alert('Failed to load debate details');
+            return;
+        }
+
+        // Create and show modal
+        showDetailModal(debate);
+    } catch (error) {
+        console.error('Failed to load debate detail:', error);
+        alert('Failed to load debate details');
+    }
+}
+
+function showDetailModal(debate) {
+    // Remove existing modal if any
+    const existingModal = document.getElementById('historyDetailModal');
+    if (existingModal) existingModal.remove();
+
+    const date = new Date(debate.created_at);
+    const dateStr = date.toLocaleDateString('en-US', {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+
+    const rec = (debate.recommendation || 'PENDING').toUpperCase();
+    const recClass = rec === 'GO' ? 'go' : rec === 'PIVOT' ? 'pivot' : 'hold';
+
+    // Build executives section
+    let execsHtml = '';
+    const executives = debate.executives || {};
+    for (const [role, exec] of Object.entries(executives)) {
+        const emoji = exec.emoji || '👤';
+        const name = exec.name || role.toUpperCase();
+        const title = exec.title || '';
+
+        // Try to extract recommendation from parsed data
+        let execRec = '';
+        if (exec.parsed_data) {
+            const recKey = `${role === 'cfo' ? 'financial' : role === 'cpo' ? 'product' : role === 'cto' ? 'technology' : 'revenue'}_recommendation`;
+            execRec = exec.parsed_data[recKey] || '';
+        }
+
+        execsHtml += `
+            <div class="modal-exec-card">
+                <h5>${emoji} ${name} <small style="color: #6B7280; font-weight: normal;">${title}</small></h5>
+                ${execRec ? `<div style="margin-bottom: 8px;"><span class="rec-badge ${getRecClass(execRec)}">${execRec.toUpperCase()}</span></div>` : ''}
+                <div class="exec-output">${formatExecSummary(exec)}</div>
+            </div>
+        `;
+    }
+
+    // Parse final decision
+    let decisionSummary = '';
+    let nextSteps = [];
+    try {
+        const finalDecision = typeof debate.final_decision === 'string'
+            ? JSON.parse(debate.final_decision)
+            : debate.final_decision;
+        if (finalDecision) {
+            decisionSummary = finalDecision.executive_summary || finalDecision.summary || '';
+            nextSteps = finalDecision.recommended_next_steps || finalDecision.next_steps || [];
+        }
+    } catch (e) {
+        decisionSummary = debate.final_decision || '';
+    }
+
+    const modal = document.createElement('div');
+    modal.id = 'historyDetailModal';
+    modal.className = 'history-detail-modal active';
+    modal.innerHTML = `
+        <div class="modal-header">
+            <h3>${dateStr}</h3>
+            <button class="close-btn" onclick="closeDetailModal()">×</button>
+        </div>
+        <div class="modal-body">
+            <div class="modal-section">
+                <h4>Question</h4>
+                <p>${escapeHtml(debate.question)}</p>
+            </div>
+
+            <div class="modal-section">
+                <h4>Decision</h4>
+                <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 12px;">
+                    <span class="recommendation-badge ${recClass}" style="padding: 12px 20px; font-size: 1.1em;">
+                        ${rec}<br><small>${debate.confidence || 0}%</small>
+                    </span>
+                    <div>
+                        <div style="color: #6B7280; font-size: 0.9em;">Consensus Level</div>
+                        <div style="font-size: 1.2em; font-weight: 600;">${debate.consensus_level ? Math.round(debate.consensus_level * 100) : 0}%</div>
+                    </div>
+                </div>
+                ${decisionSummary ? `<p>${escapeHtml(decisionSummary)}</p>` : ''}
+            </div>
+
+            ${nextSteps.length > 0 ? `
+                <div class="modal-section">
+                    <h4>Next Steps</h4>
+                    <ul style="margin: 0; padding-left: 20px;">
+                        ${nextSteps.map(step => `<li>${escapeHtml(step)}</li>`).join('')}
+                    </ul>
+                </div>
+            ` : ''}
+
+            ${execsHtml ? `
+                <div class="modal-section">
+                    <h4>Executive Perspectives</h4>
+                    <div class="modal-executives-grid">
+                        ${execsHtml}
+                    </div>
+                </div>
+            ` : ''}
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Close on overlay click
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeDetailModal();
+    });
+}
+
+function closeDetailModal() {
+    const modal = document.getElementById('historyDetailModal');
+    if (modal) modal.remove();
+}
+
+function formatExecSummary(exec) {
+    if (!exec.parsed_data) {
+        // Show truncated raw output
+        const output = exec.output || '';
+        return escapeHtml(output.substring(0, 200) + (output.length > 200 ? '...' : ''));
+    }
+
+    const data = exec.parsed_data;
+    let summary = [];
+
+    // Extract key insights based on available fields
+    if (data.roi_analysis) summary.push(`ROI: ${typeof data.roi_analysis === 'object' ? JSON.stringify(data.roi_analysis) : data.roi_analysis}`);
+    if (data.market_demand) summary.push(`Market Demand: ${data.market_demand}`);
+    if (data.technical_feasibility) summary.push(`Feasibility: ${data.technical_feasibility}`);
+    if (data.sales_impact) summary.push(`Sales Impact: ${data.sales_impact}`);
+    if (data.confidence_level) summary.push(`Confidence: ${data.confidence_level}%`);
+
+    if (summary.length === 0) {
+        return escapeHtml(JSON.stringify(data).substring(0, 200) + '...');
+    }
+
+    return summary.map(s => escapeHtml(s)).join('<br>');
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
 // ============================================================================
@@ -839,4 +1504,22 @@ document.addEventListener('DOMContentLoaded', () => {
     questionInput.value = DEFAULT_QUESTION;
 
     connectWebSocket();
+
+    // Load history count on startup (optional preview)
+    loadHistoryPreview();
 });
+
+async function loadHistoryPreview() {
+    try {
+        const response = await fetch('/api/debates');
+        const data = await response.json();
+        if (data.count > 0) {
+            const historyBtn = document.querySelector('.history-btn');
+            if (historyBtn) {
+                historyBtn.textContent = `📜 History (${data.count})`;
+            }
+        }
+    } catch (e) {
+        // Silently fail - database might not be configured
+    }
+}

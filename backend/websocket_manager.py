@@ -85,5 +85,86 @@ class WebSocketManager:
             "timestamp": datetime.now().isoformat()
         })
 
+    # ============================================================================
+    # Council-specific broadcast methods
+    # ============================================================================
+
+    async def broadcast_council_divergence_start(self, providers: list):
+        """Notify clients that Council divergence phase started"""
+        await self.broadcast({
+            "type": "council_divergence_start",
+            "providers": providers,
+            "total_providers": len(providers),
+            "timestamp": datetime.now().isoformat()
+        })
+
+    async def stream_council_response(self, provider_id: str, token: str):
+        """Stream individual LLM response during divergence"""
+        await self.broadcast({
+            "type": "council_response_streaming",
+            "provider_id": provider_id,
+            "token": token,
+            "timestamp": datetime.now().isoformat()
+        })
+
+    async def broadcast_council_response_complete(self, provider_id: str, response: str, parsed_data: dict = None):
+        """Notify that one LLM has completed its response"""
+        await self.broadcast({
+            "type": "council_response_complete",
+            "provider_id": provider_id,
+            "response": response[:500] + "..." if len(response) > 500 else response,
+            "parsed_data": parsed_data,
+            "timestamp": datetime.now().isoformat()
+        })
+
+    async def broadcast_peer_review(self, reviewer_id: str, target_id: str, score: int):
+        """Broadcast individual peer review completion"""
+        await self.broadcast({
+            "type": "council_peer_review",
+            "reviewer_id": reviewer_id,
+            "target_id": target_id,
+            "score": score,
+            "timestamp": datetime.now().isoformat()
+        })
+
+    async def broadcast_rating_matrix(self, matrix: dict):
+        """Broadcast completed rating matrix"""
+        await self.broadcast({
+            "type": "council_rating_matrix",
+            "matrix": matrix,
+            "timestamp": datetime.now().isoformat()
+        })
+
+    async def broadcast_council_decision(self, decision: dict, chairman_provider: str):
+        """Broadcast final council decision from chairman"""
+        await self.broadcast({
+            "type": "council_final_decision",
+            "decision": decision,
+            "chairman_provider": chairman_provider,
+            "timestamp": datetime.now().isoformat()
+        })
+
+    # ============================================================================
+    # Comparison broadcast methods
+    # ============================================================================
+
+    async def broadcast_comparison_started(self):
+        """Notify that both methods are running in parallel"""
+        await self.broadcast({
+            "type": "comparison_started",
+            "timestamp": datetime.now().isoformat()
+        })
+
+    async def broadcast_comparison_complete(self, consensus_result: dict, council_result: dict, comparison: dict):
+        """Broadcast comparison results when both methods complete"""
+        await self.broadcast({
+            "type": "comparison_complete",
+            "consensus": consensus_result,
+            "council": council_result,
+            "comparison": comparison,
+            "timestamp": datetime.now().isoformat()
+        })
+
+
 # Global manager
 manager = WebSocketManager()
